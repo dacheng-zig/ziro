@@ -1,9 +1,9 @@
 # See arm64 procedure call standard
 # https://github.com/ARM-software/abi-aa/releases
-.global _libcoro_stack_swap
-_libcoro_stack_swap:
-.global libcoro_stack_swap
-libcoro_stack_swap:
+.global _ziro_stack_swap
+_ziro_stack_swap:
+.global ziro_stack_swap
+ziro_stack_swap:
 
 # Store caller registers on the current stack
 # Each register requires 8 bytes, there are 20 registers to save

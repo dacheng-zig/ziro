@@ -1,7 +1,7 @@
 # See Microsoft x86-64 calling convention
 # https://learn.microsoft.com/en-us/cpp/build/x64-calling-convention
-.global libcoro_stack_swap
-libcoro_stack_swap:
+.global ziro_stack_swap
+ziro_stack_swap:
 # Store Windows stack information
 pushq %gs:0x10
 pushq %gs:0x08

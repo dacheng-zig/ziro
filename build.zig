@@ -4,58 +4,59 @@ pub fn build(b: *std.Build) !void {
     // Options
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
-    const default_stack_size = b.option(usize, "libcoro_default_stack_size", "Default stack size for coroutines") orelse 1024 * 4;
-    const debug_log_level = b.option(usize, "libcoro_debug_log_level", "Debug log level for coroutines") orelse 0;
+    const default_stack_size = b.option(usize, "ziro_default_stack_size", "Default stack size for coroutines") orelse 1024 * 4;
+    const debug_log_level = b.option(usize, "ziro_debug_log_level", "Debug log level for coroutines") orelse 0;
 
     // Deps
     const xev = b.dependency("libxev", .{}).module("xev");
 
     // Module
-    const coro_options = b.addOptions();
-    coro_options.addOption(usize, "default_stack_size", default_stack_size);
-    coro_options.addOption(usize, "debug_log_level", debug_log_level);
-    const coro_options_module = coro_options.createModule();
-    const coro = b.addModule("libcoro", .{
+    const ziro_options = b.addOptions();
+    ziro_options.addOption(usize, "default_stack_size", default_stack_size);
+    ziro_options.addOption(usize, "debug_log_level", debug_log_level);
+    const ziro_options_module = ziro_options.createModule();
+
+    const ziro = b.addModule("ziro", .{
         .root_source_file = b.path("src/main.zig"),
         .imports = &.{
             .{ .name = "xev", .module = xev },
-            .{ .name = "libcoro_options", .module = coro_options_module },
+            .{ .name = "ziro_options", .module = ziro_options_module },
         },
     });
 
     {
-        const coro_test = b.addTest(.{
-            .name = "corotest",
-            .root_source_file = b.path("src/test.zig"),
+        const ziro_test = b.addTest(.{
+            .name = "zirotest",
+            .root_source_file = b.path("src/ziro_test.zig"),
             .target = target,
             .optimize = optimize,
         });
-        coro_test.root_module.addImport("libcoro", coro);
-        coro_test.linkLibC();
+        ziro_test.root_module.addImport("ziro", ziro);
+        ziro_test.linkLibC();
 
-        const internal_test = b.addTest(.{
-            .name = "corotest-internal",
-            .root_source_file = b.path("src/coro.zig"),
+        const ziro_test_internal = b.addTest(.{
+            .name = "zirotest-internal",
+            .root_source_file = b.path("src/ziro.zig"),
             .target = target,
             .optimize = optimize,
         });
-        internal_test.root_module.addImport("libcoro_options", coro_options_module);
-        internal_test.linkLibC();
+        ziro_test_internal.root_module.addImport("ziro_options", ziro_options_module);
+        ziro_test_internal.linkLibC();
 
         // Test step
-        const test_step = b.step("test", "Run tests");
-        test_step.dependOn(&b.addRunArtifact(coro_test).step);
-        test_step.dependOn(&b.addRunArtifact(internal_test).step);
+        const test_step = b.step("test-ziro", "Run tests");
+        test_step.dependOn(&b.addRunArtifact(ziro_test).step);
+        test_step.dependOn(&b.addRunArtifact(ziro_test_internal).step);
     }
 
     {
         const aio_test = b.addTest(.{
             .name = "aiotest",
-            .root_source_file = b.path("src/test_aio.zig"),
+            .root_source_file = b.path("src/asyncio_test.zig"),
             .target = target,
             .optimize = optimize,
         });
-        aio_test.root_module.addImport("libcoro", coro);
+        aio_test.root_module.addImport("ziro", ziro);
         aio_test.root_module.addImport("xev", xev);
         aio_test.linkLibC();
 
@@ -72,12 +73,14 @@ pub fn build(b: *std.Build) !void {
             .target = target,
             .optimize = .ReleaseFast,
         });
-        bench.root_module.addImport("libcoro", coro);
+        bench.root_module.addImport("ziro", ziro);
         bench.linkLibC();
+
         const bench_run = b.addRunArtifact(bench);
         if (b.args) |args| {
             bench_run.addArgs(args);
         }
+
         const bench_step = b.step("benchmark", "Run benchmark");
         bench_step.dependOn(&bench_run.step);
         bench_step.dependOn(&b.addInstallArtifact(bench, .{}).step);

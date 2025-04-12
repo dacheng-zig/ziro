@@ -26,8 +26,8 @@ Async IO supported on Linux {`x86_64`, `aarch64`}, and Mac {`x86_64`, `aarch64`}
 
 `build.zig`
 ```zig
-const libcoro = b.dependency("zigcoro", .{}).module("libcoro");
-my_lib.addModule("libcoro", libcoro);
+const ziro = b.dependency("ziro", .{}).module("ziro");
+my_lib.addModule("ziro", ziro);
 ```
 
 ## Current status
@@ -83,7 +83,7 @@ remainingStackSize()->usize
 
 ## Async IO API
 
-[`libcoro.asyncio`][aio] provides coroutine-based async IO functionality
+[`ziro.asyncio`][aio] provides coroutine-based async IO functionality
 building upon the event loop from [`libxev`][libxev],
 providing coroutine-friendly wrappers to all the [high-level
 async APIs][libxev-watchers].

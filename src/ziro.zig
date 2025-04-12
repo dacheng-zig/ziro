@@ -1,4 +1,4 @@
-//! libcoro mutable state:
+//! ziro mutable state:
 //! * ThreadState
 //!   * current_coro: set in ThreadState.switchTo
 //!   * next_coro_id: set in ThreadState.nextCoroId
@@ -11,12 +11,12 @@
 //!   * id.invocation: incremented in ThreadState.switchTo
 const std = @import("std");
 const builtin = @import("builtin");
-const base = @import("coro_base.zig");
+const base = @import("ziro_base.zig");
 const Executor = @import("executor.zig").Executor;
-const libcoro_options = @import("libcoro_options");
+const ziro_options = @import("ziro_options");
 
-const log = std.log.scoped(.libcoro);
-const debug_log_level = libcoro_options.debug_log_level;
+const log = std.log.scoped(.ziro);
+const debug_log_level = ziro_options.debug_log_level;
 
 // Public API
 // ============================================================================
@@ -27,7 +27,7 @@ pub const Error = error{
 };
 pub const StackT = []align(base.stack_alignment) u8;
 pub const stack_alignment = base.stack_alignment;
-pub const default_stack_size = libcoro_options.default_stack_size;
+pub const default_stack_size = ziro_options.default_stack_size;
 
 pub const Frame = *Coro;
 

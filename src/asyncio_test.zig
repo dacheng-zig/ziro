@@ -1,7 +1,7 @@
 const std = @import("std");
-const libcoro = @import("libcoro");
 const xev = @import("xev");
-const aio = libcoro.asyncio;
+const ziro = @import("ziro");
+const aio = ziro.asyncio;
 
 threadlocal var env: struct { allocator: std.mem.Allocator, exec: *aio.Executor } = undefined;
 
@@ -27,7 +27,7 @@ const AioTest = struct {
         exec.* = aio.Executor.init(loop);
         const stack_size = 1024 * 128;
         const num_stacks = 5;
-        const stacks = try allocator.alignedAlloc(u8, libcoro.stack_alignment, num_stacks * stack_size);
+        const stacks = try allocator.alignedAlloc(u8, ziro.stack_alignment, num_stacks * stack_size);
 
         // Thread-local env
         env = .{
@@ -61,7 +61,7 @@ const AioTest = struct {
     }
 
     fn run(self: @This(), func: anytype) !void {
-        const stack = try libcoro.stackAlloc(self.allocator, 1024 * 32);
+        const stack = try ziro.stackAlloc(self.allocator, 1024 * 32);
         defer self.allocator.free(stack);
         try aio.run(self.exec, func, .{}, stack);
     }
@@ -75,7 +75,7 @@ test "aio sleep top-level" {
 
 fn sleep(ms: u64) !i64 {
     try aio.sleep(env.exec, ms);
-    try std.testing.expect(libcoro.remainingStackSize() > 1024 * 2);
+    try std.testing.expect(ziro.remainingStackSize() > 1024 * 2);
     return std.time.milliTimestamp();
 }
 
@@ -83,7 +83,7 @@ test "aio sleep run" {
     const t = try AioTest.init();
     defer t.deinit();
 
-    const stack = try libcoro.stackAlloc(
+    const stack = try ziro.stackAlloc(
         t.allocator,
         null,
     );
@@ -96,22 +96,22 @@ test "aio sleep run" {
 }
 
 fn sleepTask() !void {
-    const stack = try libcoro.stackAlloc(
+    const stack = try ziro.stackAlloc(
         env.allocator,
         null,
     );
     defer env.allocator.free(stack);
-    const sleep1 = try aio.xasync(sleep, .{10}, stack);
+    const sleep1 = try ziro.xasync(sleep, .{10}, stack);
 
-    const stack2 = try libcoro.stackAlloc(
+    const stack2 = try ziro.stackAlloc(
         env.allocator,
         null,
     );
     defer env.allocator.free(stack2);
-    const sleep2 = try aio.xasync(sleep, .{20}, stack2);
+    const sleep2 = try ziro.xasync(sleep, .{20}, stack2);
 
-    const after = try aio.xawait(sleep1);
-    const after2 = try aio.xawait(sleep2);
+    const after = try ziro.xawait(sleep1);
+    const after2 = try ziro.xawait(sleep2);
 
     try std.testing.expect(after2 > (after + 7));
     try std.testing.expect(after2 < (after + 13));
@@ -121,7 +121,7 @@ test "aio concurrent sleep" {
     const t = try AioTest.init();
     defer t.deinit();
 
-    const stack = try libcoro.stackAlloc(
+    const stack = try ziro.stackAlloc(
         t.allocator,
         1024 * 8,
     );
@@ -160,15 +160,15 @@ fn aioTimersMain() !void {
     var tick_state = TickState{};
 
     // 2 parallel timer loops, one fast, one slow
-    const stack1 = try libcoro.stackAlloc(env.allocator, stack_size);
+    const stack1 = try ziro.stackAlloc(env.allocator, stack_size);
     defer env.allocator.free(stack1);
-    const co1 = try aio.xasync(tickLoop, .{ 10, &tick_state }, stack1);
-    const stack2 = try libcoro.stackAlloc(env.allocator, stack_size);
+    const co1 = try ziro.xasync(tickLoop, .{ 10, &tick_state }, stack1);
+    const stack2 = try ziro.stackAlloc(env.allocator, stack_size);
     defer env.allocator.free(stack2);
-    const co2 = try aio.xasync(tickLoop, .{ 20, &tick_state }, stack2);
+    const co2 = try ziro.xasync(tickLoop, .{ 20, &tick_state }, stack2);
 
-    try aio.xawait(co1);
-    try aio.xawait(co2);
+    try ziro.xawait(co1);
+    try ziro.xawait(co2);
 }
 
 test "aio timers" {
@@ -182,14 +182,14 @@ fn tcpMain() !void {
 
     var info: ServerInfo = .{};
 
-    var server = try aio.xasync(tcpServer, .{&info}, stack_size);
+    var server = try ziro.xasync(tcpServer, .{&info}, stack_size);
     defer server.deinit();
 
-    var client = try aio.xasync(tcpClient, .{&info}, stack_size);
+    var client = try ziro.xasync(tcpClient, .{&info}, stack_size);
     defer client.deinit();
 
-    try aio.xawait(server);
-    try aio.xawait(client);
+    try ziro.xawait(server);
+    try ziro.xawait(client);
 }
 
 test "aio tcp" {
@@ -232,16 +232,16 @@ fn udpMain() !void {
     const stack_size = 1024 * 32;
     var info: ServerInfo = .{};
 
-    const stack1 = try libcoro.stackAlloc(env.allocator, stack_size);
+    const stack1 = try ziro.stackAlloc(env.allocator, stack_size);
     defer env.allocator.free(stack1);
-    const server_co = try aio.xasync(udpServer, .{&info}, stack1);
+    const server_co = try ziro.xasync(udpServer, .{&info}, stack1);
 
-    const stack2 = try libcoro.stackAlloc(env.allocator, stack_size);
+    const stack2 = try ziro.stackAlloc(env.allocator, stack_size);
     defer env.allocator.free(stack2);
-    const client_co = try aio.xasync(udpClient, .{&info}, stack2);
+    const client_co = try ziro.xasync(udpClient, .{&info}, stack2);
 
-    try aio.xawait(server_co);
-    try aio.xawait(client_co);
+    try ziro.xawait(server_co);
+    try ziro.xawait(client_co);
 }
 
 test "aio udp" {
@@ -273,16 +273,16 @@ fn asyncMain() !void {
     const stack_size = 1024 * 32;
     var nstate = NotifierState{ .x = try xev.Async.init() };
 
-    const stack = try libcoro.stackAlloc(env.allocator, stack_size);
+    const stack = try ziro.stackAlloc(env.allocator, stack_size);
     defer env.allocator.free(stack);
-    const co = try aio.xasync(asyncTest, .{&nstate}, stack);
+    const co = try ziro.xasync(asyncTest, .{&nstate}, stack);
 
-    const stack2 = try libcoro.stackAlloc(env.allocator, stack_size);
+    const stack2 = try ziro.stackAlloc(env.allocator, stack_size);
     defer env.allocator.free(stack2);
-    const nco = try aio.xasync(asyncNotifier, .{&nstate}, stack2);
+    const nco = try ziro.xasync(asyncNotifier, .{&nstate}, stack2);
 
-    try aio.xawait(co);
-    try aio.xawait(nco);
+    try ziro.xawait(co);
+    try ziro.xawait(nco);
 }
 
 test "aio async" {
@@ -386,13 +386,13 @@ test "aio sleep env" {
 }
 
 fn sleepTaskEnv() !void {
-    var sleep1 = try aio.xasync(sleep, .{10}, null);
+    var sleep1 = try ziro.xasync(sleep, .{10}, null);
     defer sleep1.deinit();
-    var sleep2 = try aio.xasync(sleep, .{20}, null);
+    var sleep2 = try ziro.xasync(sleep, .{20}, null);
     defer sleep2.deinit();
 
-    const after = try aio.xawait(sleep1);
-    const after2 = try aio.xawait(sleep2);
+    const after = try ziro.xawait(sleep1);
+    const after2 = try ziro.xawait(sleep2);
 
     try std.testing.expect(after2 > (after + 7));
     try std.testing.expect(after2 < (after + 13));
@@ -410,7 +410,7 @@ test "aio concurrent sleep env" {
     try std.testing.expect(after < (before + 23));
 }
 
-const UsizeChannel = libcoro.Channel(usize, .{ .capacity = 10 });
+const UsizeChannel = ziro.Channel(usize, .{ .capacity = 10 });
 
 fn sender(chan: *UsizeChannel, count: usize) !void {
     defer chan.close();
@@ -428,13 +428,13 @@ fn recvr(chan: *UsizeChannel) usize {
 
 fn chanMain() !usize {
     var chan = UsizeChannel.init(null);
-    const send_frame = try libcoro.xasync(sender, .{ &chan, 6 }, null);
+    const send_frame = try ziro.xasync(sender, .{ &chan, 6 }, null);
     defer send_frame.deinit();
-    const recv_frame = try libcoro.xasync(recvr, .{&chan}, null);
+    const recv_frame = try ziro.xasync(recvr, .{&chan}, null);
     defer recv_frame.deinit();
 
-    try libcoro.xawait(send_frame);
-    return libcoro.xawait(recv_frame);
+    try ziro.xawait(send_frame);
+    return ziro.xawait(recv_frame);
 }
 
 test "aio mix channels" {
@@ -466,7 +466,7 @@ fn asyncRecurseSleepAndNotification() !void {
     var notification = aio.AsyncNotification.init(env.exec, nstate.x);
     defer notification.notif.deinit();
 
-    const asyncTaskDoingAsyncSleep = try aio.xasync(struct {
+    const asyncTaskDoingAsyncSleep = try ziro.xasync(struct {
         fn call(exec: *aio.Executor, state: *TaskState) !void {
             try aio.sleep(exec, 1);
             state.called = true;
@@ -477,7 +477,7 @@ fn asyncRecurseSleepAndNotification() !void {
     try pool.spawn(notifyAfterBlockingSleep, .{ &notification, &nstate });
 
     try notification.wait();
-    try libcoro.xawait(asyncTaskDoingAsyncSleep);
+    try ziro.xawait(asyncTaskDoingAsyncSleep);
 
     try std.testing.expect(nstate.notified);
     try std.testing.expect(tstate.called);

@@ -1,6 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const Error = @import("coro.zig").Error;
+const Error = @import("ziro.zig").Error;
 
 const ArchInfo = struct {
     num_registers: usize,
@@ -12,31 +12,31 @@ const arch_info: ArchInfo = switch (builtin.cpu.arch) {
     .aarch64 => .{
         .num_registers = 20,
         .jump_idx = 19,
-        .assembly = @embedFile("asm/coro_aarch64.s"),
+        .assembly = @embedFile("asm/ziro_aarch64.s"),
+    },
+    .riscv64 => .{
+        .num_registers = 25,
+        .jump_idx = 24,
+        .assembly = @embedFile("asm/ziro_riscv64.s"),
     },
     .x86_64 => switch (builtin.os.tag) {
         .windows => .{
             .num_registers = 32,
             .jump_idx = 30,
-            .assembly = @embedFile("asm/coro_x86_64_windows.s"),
+            .assembly = @embedFile("asm/ziro_x86_64_windows.s"),
         },
         else => .{
             .num_registers = 8,
             .jump_idx = 6,
-            .assembly = @embedFile("asm/coro_x86_64.s"),
+            .assembly = @embedFile("asm/ziro_x86_64.s"),
         },
-    },
-    .riscv64 => .{
-        .num_registers = 25,
-        .jump_idx = 24,
-        .assembly = @embedFile("asm/coro_riscv64.s"),
     },
     else => @compileError("Unsupported cpu architecture"),
 };
 
 pub const stack_alignment = 16;
 
-extern fn libcoro_stack_swap(current: *Coro, target: *Coro) void;
+extern fn ziro_stack_swap(current: *Coro, target: *Coro) void;
 comptime {
     asm (arch_info.assembly);
 }
@@ -62,6 +62,6 @@ pub const Coro = packed struct {
     }
 
     pub inline fn resumeFrom(self: *Self, from: *Self) void {
-        libcoro_stack_swap(from, self);
+        ziro_stack_swap(from, self);
     }
 };

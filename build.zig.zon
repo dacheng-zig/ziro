@@ -1,7 +1,7 @@
 .{
-    .name = .zigcoro,
+    .name = .ziro,
     .version = "0.0.0",
-    .fingerprint =  0x7b811699439f32ff,
+    .fingerprint = 0xa2c408f6d87f9380,
 
     .dependencies = .{
         .libxev = .{
@@ -9,19 +9,23 @@
             .hash = "libxev-0.0.0-86vtc-zkEgB7uv1i0Sa6ytJETZQi_lHJrImu9mLb9moi",
         },
     },
+
     .paths = .{
-        "build.zig.zon",
-        "build.zig",
         "benchmark.zig",
-        "src/coro_base.zig",
-        "src/asm/coro_x86_64_windows.s",
-        "src/asm/coro_x86_64.s",
-        "src/asm/coro_aarch64.s",
-        "src/main.zig",
-        "src/coro.zig",
-        "src/test_aio.zig",
-        "src/executor.zig",
+        "build.zig",
+        "build.zig.zon",
+        "src/asm/ziro_aarch64.s",
+        "src/asm/ziro_riscv64.s",
+        "src/asm/ziro_x86_64.s",
+        "src/asm/ziro_x86_64_windows.s",
         "src/asyncio.zig",
-        "src/test.zig",
+        "src/asyncio_test.zig",
+        "src/executor.zig",
+        "src/main.zig",
+        "src/waitgroup.zig",
+        "src/waitgroup_test.zig",
+        "src/ziro.zig",
+        "src/ziro_base.zig",
+        "src/ziro_test.zig",
     },
 }

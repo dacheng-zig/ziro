@@ -1,9 +1,9 @@
 # See System V x86-64 calling convention
 # https://gitlab.com/x86-psABIs/x86-64-ABI
-.global _libcoro_stack_swap
-_libcoro_stack_swap:
-.global libcoro_stack_swap
-libcoro_stack_swap:
+.global _ziro_stack_swap
+_ziro_stack_swap:
+.global ziro_stack_swap
+ziro_stack_swap:
 # Store caller registers on the current stack
 pushq %rbp
 pushq %rbx

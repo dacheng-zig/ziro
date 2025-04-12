@@ -1,7 +1,7 @@
 # See riscv procedure calling convention
 # https://github.com/riscv-non-isa/riscv-elf-psabi-doc
-.global libcoro_stack_swap
-libcoro_stack_swap:
+.global ziro_stack_swap
+ziro_stack_swap:
 
 # Store caller registers on the current stack
 # Each register requires 8 bytes, there are 25 registers to save

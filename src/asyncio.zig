@@ -1,12 +1,9 @@
 const std = @import("std");
 const xev = @import("xev");
-const libcoro = @import("coro.zig");
+const ziro = @import("ziro.zig");
 const CoroExecutor = @import("executor.zig").Executor;
 
-pub const xasync = libcoro.xasync;
-pub const xawait = libcoro.xawait;
-
-const Frame = libcoro.Frame;
+const Frame = ziro.Frame;
 
 const Env = struct {
     exec: ?*Executor = null,
@@ -19,10 +16,10 @@ pub const EnvArg = struct {
 threadlocal var env: Env = .{};
 pub fn initEnv(e: EnvArg) void {
     env = .{ .exec = e.executor };
-    libcoro.initEnv(.{
+    ziro.initEnv(.{
         .stack_allocator = e.stack_allocator,
         .default_stack_size = e.default_stack_size,
-        .executor = if (e.executor) |ex| &ex.exec else null,
+        .executor = if (e.executor) |ex| &ex.exec else null, // TODO
     });
 }
 
@@ -53,18 +50,18 @@ pub fn run(
     args: anytype,
     stack: anytype,
 ) !RunT(func) {
-    std.debug.assert(!libcoro.inCoro());
-    const frame = try xasync(func, args, stack);
+    std.debug.assert(!ziro.inCoro());
+    const frame = try ziro.xasync(func, args, stack);
     defer frame.deinit();
     try runCoro(exec, frame);
-    return xawait(frame);
+    return ziro.xawait(frame);
 }
 
 /// Run a coroutine to completion.
 /// Must be called from "root", outside of any created coroutine.
 fn runCoro(exec: ?*Executor, frame: anytype) !void {
     const f = frame.frame();
-    if (f.status == .Start) libcoro.xresume(f);
+    if (f.status == .Start) ziro.xresume(f);
     const exec_ = getExec(exec);
     while (f.status != .Done) try exec_.tick();
 }
@@ -87,9 +84,9 @@ pub fn sleep(exec: ?*Executor, ms: u64) !void {
 
 fn waitForCompletion(exec: ?*Executor, c: *xev.Completion) !void {
     const exec_ = getExec(exec);
-    if (libcoro.inCoro()) {
+    if (ziro.inCoro()) {
         // In a coroutine; wait for it to be resumed
-        while (c.state() != .dead) libcoro.xsuspend();
+        while (c.state() != .dead) ziro.xsuspend();
     } else {
         // Not in a coroutine, blocking call
         while (c.state() != .dead) try exec_.tick();
@@ -152,12 +149,12 @@ pub const TCP = struct {
                 _ = s;
                 const data = userdata.?;
                 data.result = result;
-                if (data.frame != null) libcoro.xresume(data.frame.?);
+                if (data.frame != null) ziro.xresume(data.frame.?);
                 return .disarm;
             }
         };
 
-        var data: Data = .{ .frame = libcoro.xframe() };
+        var data: Data = .{ .frame = ziro.xframe() };
         const loop = getExec(self.exec).loop;
         var c: xev.Completion = .{};
         self.tcp.connect(loop, &c, addr, Data, &data, &Data.callback);
@@ -186,12 +183,12 @@ pub const TCP = struct {
                 _ = s;
                 const data = userdata.?;
                 data.result = result;
-                if (data.frame != null) libcoro.xresume(data.frame.?);
+                if (data.frame != null) ziro.xresume(data.frame.?);
                 return .disarm;
             }
         };
 
-        var data: Data = .{ .frame = libcoro.xframe() };
+        var data: Data = .{ .frame = ziro.xframe() };
         const loop = getExec(self.exec).loop;
         var c: xev.Completion = .{};
         self.tcp.shutdown(loop, &c, Data, &data, &Data.callback);
@@ -232,12 +229,12 @@ fn Closeable(comptime T: type, comptime StreamT: type) type {
                     _ = s;
                     const data = userdata.?;
                     data.result = result;
-                    if (data.frame != null) libcoro.xresume(data.frame.?);
+                    if (data.frame != null) ziro.xresume(data.frame.?);
                     return .disarm;
                 }
             };
 
-            var data: Data = .{ .frame = libcoro.xframe() };
+            var data: Data = .{ .frame = ziro.xframe() };
 
             const loop = getExec(self.exec).loop;
             var c: xev.Completion = .{};
@@ -274,12 +271,12 @@ fn Readable(comptime T: type, comptime StreamT: type) type {
                     _ = b;
                     const data = userdata.?;
                     data.result = result;
-                    if (data.frame != null) libcoro.xresume(data.frame.?);
+                    if (data.frame != null) ziro.xresume(data.frame.?);
                     return .disarm;
                 }
             };
 
-            var data: Data = .{ .frame = libcoro.xframe() };
+            var data: Data = .{ .frame = ziro.xframe() };
 
             const loop = getExec(self.exec).loop;
             var c: xev.Completion = .{};
@@ -316,12 +313,12 @@ fn Writeable(comptime T: type, comptime StreamT: type) type {
                     _ = b;
                     const data = userdata.?;
                     data.result = result;
-                    if (data.frame != null) libcoro.xresume(data.frame.?);
+                    if (data.frame != null) ziro.xresume(data.frame.?);
                     return .disarm;
                 }
             };
 
-            var data: Data = .{ .frame = libcoro.xframe() };
+            var data: Data = .{ .frame = ziro.xframe() };
 
             const loop = getExec(self.exec).loop;
             var c: xev.Completion = .{};
@@ -376,12 +373,12 @@ pub const File = struct {
                 _ = b;
                 const data = userdata.?;
                 data.result = result;
-                if (data.frame != null) libcoro.xresume(data.frame.?);
+                if (data.frame != null) ziro.xresume(data.frame.?);
                 return .disarm;
             }
         };
 
-        var data: Data = .{ .frame = libcoro.xframe() };
+        var data: Data = .{ .frame = ziro.xframe() };
 
         const loop = getExec(self.exec).loop;
         var c: xev.Completion = .{};
@@ -413,12 +410,12 @@ pub const File = struct {
                 _ = b;
                 const data = userdata.?;
                 data.result = result;
-                if (data.frame != null) libcoro.xresume(data.frame.?);
+                if (data.frame != null) ziro.xresume(data.frame.?);
                 return .disarm;
             }
         };
 
-        var data: Data = .{ .frame = libcoro.xframe() };
+        var data: Data = .{ .frame = ziro.xframe() };
 
         const loop = getExec(self.exec).loop;
         var c: xev.Completion = .{};
@@ -526,7 +523,7 @@ pub const UDP = struct {
                 _ = b;
                 const data = userdata.?;
                 data.result = result;
-                if (data.frame != null) libcoro.xresume(data.frame.?);
+                if (data.frame != null) ziro.xresume(data.frame.?);
                 return .disarm;
             }
         };
@@ -534,7 +531,7 @@ pub const UDP = struct {
         const loop = getExec(self.exec).loop;
         var s: xev.UDP.State = undefined;
         var c: xev.Completion = .{};
-        var data: Data = .{ .frame = libcoro.xframe() };
+        var data: Data = .{ .frame = ziro.xframe() };
         self.udp.read(loop, &c, &s, buf, Data, &data, &Data.callback);
 
         try waitForCompletion(self.exec, &c);
@@ -565,7 +562,7 @@ pub const UDP = struct {
                 _ = b;
                 const data = userdata.?;
                 data.result = result;
-                if (data.frame != null) libcoro.xresume(data.frame.?);
+                if (data.frame != null) ziro.xresume(data.frame.?);
                 return .disarm;
             }
         };
@@ -573,7 +570,7 @@ pub const UDP = struct {
         const loop = getExec(self.exec).loop;
         var s: xev.UDP.State = undefined;
         var c: xev.Completion = .{};
-        var data: Data = .{ .frame = libcoro.xframe() };
+        var data: Data = .{ .frame = ziro.xframe() };
         self.udp.write(loop, &c, &s, addr, buf, Data, &data, &Data.callback);
 
         try waitForCompletion(self.exec, &c);
@@ -596,7 +593,7 @@ fn XCallback(comptime ResultT: type) type {
         result: ResultT = undefined,
 
         fn init() @This() {
-            return .{ .frame = libcoro.xframe() };
+            return .{ .frame = ziro.xframe() };
         }
 
         fn callback(
@@ -607,7 +604,7 @@ fn XCallback(comptime ResultT: type) type {
         ) xev.CallbackAction {
             const data = userdata.?;
             data.result = result;
-            if (data.frame != null) libcoro.xresume(data.frame.?);
+            if (data.frame != null) ziro.xresume(data.frame.?);
             return .disarm;
         }
     };

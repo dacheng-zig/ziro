@@ -1,6 +1,6 @@
 const std = @import("std");
-const libcoro = @import("coro.zig");
-const libcoro_options = @import("libcoro_options");
+const ziro = @import("ziro.zig");
+const ziro_options = @import("ziro_options");
 
 pub const Executor = struct {
     const Self = @This();
@@ -19,6 +19,7 @@ pub const Executor = struct {
             @call(.auto, self.func, .{self.userdata});
         }
     };
+
     readyq: Queue(Func) = .{},
 
     pub fn init() Self {
@@ -38,12 +39,12 @@ pub const Executor = struct {
         var now = self.readyq;
         self.readyq = .{};
 
-        if (libcoro_options.debug_log_level >= 3) std.debug.print("Executor.tick readyq_len={d}\n", .{now.len()});
+        if (ziro_options.debug_log_level >= 3) std.debug.print("Executor.tick readyq_len={d}\n", .{now.len()});
 
         var count: usize = 0;
         while (now.pop()) |func| : (count += 1) func.run();
 
-        if (libcoro_options.debug_log_level >= 3) std.debug.print("Executor.tick done\n", .{});
+        if (ziro_options.debug_log_level >= 3) std.debug.print("Executor.tick done\n", .{});
 
         return count > 0;
     }
@@ -95,49 +96,49 @@ pub fn Channel(comptime T: type, comptime config: ChannelConfig) type {
     };
 }
 
-const Condition = struct {
+pub const Condition = struct {
     const Self = @This();
 
     exec: *Executor,
     waiters: Queue(Executor.Func) = .{},
 
-    fn init(exec: *Executor) Self {
+    pub fn init(exec: *Executor) Self {
         return .{ .exec = exec };
     }
 
-    fn broadcast(self: *Self) void {
+    pub fn broadcast(self: *Self) void {
         std.debug.assert(!self.notified);
         self.exec.runAllSoon(self.waiters);
     }
 
-    fn signal(self: *Self) void {
+    pub fn signal(self: *Self) void {
         if (self.waiters.pop()) |waiter| self.exec.runSoon(waiter);
     }
 
-    fn wait(self: *Self) void {
-        var res = CoroResume.init();
-        var cb = res.func();
-        self.waiters.push(&cb);
-        libcoro.xsuspend();
+    pub fn wait(self: *Self) void {
+        var resumer = CoroResumer.init();
+        var func = resumer.func();
+        self.waiters.push(&func);
+        ziro.xsuspend();
     }
 };
 
-const CoroResume = struct {
+const CoroResumer = struct {
     const Self = @This();
 
-    coro: libcoro.Frame,
+    coro: ziro.Frame,
 
     fn init() Self {
-        return .{ .coro = libcoro.xframe() };
+        return .{ .coro = ziro.xframe() };
     }
 
     fn func(self: *Self) Executor.Func {
-        return .{ .func = Self.cb, .userdata = self };
+        return .{ .func = Self.callback, .userdata = self };
     }
 
-    fn cb(ud: ?*anyopaque) void {
+    fn callback(ud: ?*anyopaque) void {
         const self: *Self = @ptrCast(@alignCast(ud));
-        libcoro.xresume(self.coro);
+        ziro.xresume(self.coro);
     }
 };
 
@@ -241,7 +242,7 @@ fn Queue(comptime T: type) type {
 
 fn getExec(exec: ?*Executor) *Executor {
     if (exec != null) return exec.?;
-    if (libcoro.getEnv().executor) |x| return x;
+    if (ziro.getEnv().executor) |x| return x;
     @panic("No explicit Executor passed and no default Executor available");
 }
 
