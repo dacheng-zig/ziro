@@ -27,7 +27,7 @@ Async IO supported on Linux {`x86_64`, `aarch64`}, and Mac {`x86_64`, `aarch64`}
 `build.zig`
 ```zig
 const ziro = b.dependency("ziro", .{}).module("ziro");
-my_lib.addModule("ziro", ziro);
+my_lib.addImport("ziro", ziro);
 ```
 
 ## Current status
