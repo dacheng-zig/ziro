@@ -96,12 +96,12 @@ test "aio sleep run" {
 }
 
 fn sleepTask() !void {
-    const stack = try ziro.stackAlloc(
+    const stack1 = try ziro.stackAlloc(
         env.allocator,
         null,
     );
-    defer env.allocator.free(stack);
-    const sleep1 = try ziro.xasync(sleep, .{10}, stack);
+    defer env.allocator.free(stack1);
+    const sleep1 = try ziro.xasync(sleep, .{10}, stack1);
 
     const stack2 = try ziro.stackAlloc(
         env.allocator,
@@ -110,11 +110,11 @@ fn sleepTask() !void {
     defer env.allocator.free(stack2);
     const sleep2 = try ziro.xasync(sleep, .{20}, stack2);
 
-    const after = try ziro.xawait(sleep1);
+    const after1 = try ziro.xawait(sleep1);
     const after2 = try ziro.xawait(sleep2);
 
-    try std.testing.expect(after2 > (after + 7));
-    try std.testing.expect(after2 < (after + 13));
+    try std.testing.expect(after2 > (after1 + 7));
+    try std.testing.expect(after2 < (after1 + 13));
 }
 
 test "aio concurrent sleep" {
