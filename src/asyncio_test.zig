@@ -177,6 +177,43 @@ test "aio timers" {
     try t.run(aioTimersMain);
 }
 
+const ServerInfo = struct {
+    addr: std.net.Address = undefined,
+};
+
+fn tcpServer(info: *ServerInfo) !void {
+    var address = try std.net.Address.parseIp4("127.0.0.1", 0);
+    const xserver = try xev.TCP.init(address);
+
+    try xserver.bind(address);
+    try xserver.listen(1);
+
+    var sock_len = address.getOsSockLen();
+    try std.posix.getsockname(xserver.fd, &address.any, &sock_len);
+    info.addr = address;
+
+    const server = aio.TCP.init(env.exec, xserver);
+    const conn = try server.accept();
+    defer conn.close() catch unreachable;
+    try server.close();
+
+    var recv_buf: [128]u8 = undefined;
+    const recv_len = try conn.read(.{ .slice = &recv_buf });
+    const send_buf = [_]u8{ 1, 1, 2, 3, 5, 8, 13 };
+    try std.testing.expect(std.mem.eql(u8, &send_buf, recv_buf[0..recv_len]));
+}
+
+fn tcpClient(info: *ServerInfo) !void {
+    const address = info.addr;
+    const xclient = try xev.TCP.init(address);
+    const client = aio.TCP.init(env.exec, xclient);
+    defer client.close() catch unreachable;
+    _ = try client.connect(address);
+    var send_buf = [_]u8{ 1, 1, 2, 3, 5, 8, 13 };
+    const send_len = try client.write(.{ .slice = &send_buf });
+    try std.testing.expectEqual(send_len, 7);
+}
+
 fn tcpMain() !void {
     const stack_size = 1024 * 32;
 
@@ -196,6 +233,57 @@ test "aio tcp" {
     const t = try AioTest.init();
     defer t.deinit();
     try t.run(tcpMain);
+}
+
+fn udpServer(info: *ServerInfo) !void {
+    var address = try std.net.Address.parseIp4("127.0.0.1", 0);
+    const xserver = try xev.UDP.init(address);
+
+    try xserver.bind(address);
+
+    var sock_len = address.getOsSockLen();
+    try std.posix.getsockname(xserver.fd, &address.any, &sock_len);
+    info.addr = address;
+
+    const server = aio.UDP.init(env.exec, xserver);
+
+    var recv_buf: [128]u8 = undefined;
+    const recv_len = try server.read(.{ .slice = &recv_buf });
+    var send_buf = [_]u8{ 1, 1, 2, 3, 5, 8, 13 };
+    try std.testing.expectEqual(recv_len, send_buf.len);
+    try std.testing.expect(std.mem.eql(u8, &send_buf, recv_buf[0..recv_len]));
+    try server.close();
+}
+
+fn udpClient(info: *ServerInfo) !void {
+    const xclient = try xev.UDP.init(info.addr);
+    const client = aio.UDP.init(env.exec, xclient);
+    var send_buf = [_]u8{ 1, 1, 2, 3, 5, 8, 13 };
+    const send_len = try client.write(info.addr, .{ .slice = &send_buf });
+    try std.testing.expectEqual(send_len, 7);
+    try client.close();
+}
+
+fn udpMain() !void {
+    const stack_size = 1024 * 32;
+    var info: ServerInfo = .{};
+
+    const stack1 = try ziro.stackAlloc(env.allocator, stack_size);
+    defer env.allocator.free(stack1);
+    const server_co = try ziro.xasync(udpServer, .{&info}, stack1);
+
+    const stack2 = try ziro.stackAlloc(env.allocator, stack_size);
+    defer env.allocator.free(stack2);
+    const client_co = try ziro.xasync(udpClient, .{&info}, stack2);
+
+    try ziro.xawait(server_co);
+    try ziro.xawait(client_co);
+}
+
+test "aio udp" {
+    const t = try AioTest.init();
+    defer t.deinit();
+    try t.run(udpMain);
 }
 
 fn fileRW() !void {
@@ -226,28 +314,6 @@ test "aio file" {
     const t = try AioTest.init();
     defer t.deinit();
     try t.run(fileRW);
-}
-
-fn udpMain() !void {
-    const stack_size = 1024 * 32;
-    var info: ServerInfo = .{};
-
-    const stack1 = try ziro.stackAlloc(env.allocator, stack_size);
-    defer env.allocator.free(stack1);
-    const server_co = try ziro.xasync(udpServer, .{&info}, stack1);
-
-    const stack2 = try ziro.stackAlloc(env.allocator, stack_size);
-    defer env.allocator.free(stack2);
-    const client_co = try ziro.xasync(udpClient, .{&info}, stack2);
-
-    try ziro.xawait(server_co);
-    try ziro.xawait(client_co);
-}
-
-test "aio udp" {
-    const t = try AioTest.init();
-    defer t.deinit();
-    try t.run(udpMain);
 }
 
 fn processTest() !void {
@@ -289,72 +355,6 @@ test "aio async" {
     const t = try AioTest.init();
     defer t.deinit();
     try t.run(asyncMain);
-}
-
-const ServerInfo = struct {
-    addr: std.net.Address = undefined,
-};
-
-fn tcpServer(info: *ServerInfo) !void {
-    var address = try std.net.Address.parseIp4("127.0.0.1", 0);
-    const xserver = try xev.TCP.init(address);
-
-    try xserver.bind(address);
-    try xserver.listen(1);
-
-    var sock_len = address.getOsSockLen();
-    try std.posix.getsockname(xserver.fd, &address.any, &sock_len);
-    info.addr = address;
-
-    const server = aio.TCP.init(env.exec, xserver);
-    const conn = try server.accept();
-    defer conn.close() catch unreachable;
-    try server.close();
-
-    var recv_buf: [128]u8 = undefined;
-    const recv_len = try conn.read(.{ .slice = &recv_buf });
-    const send_buf = [_]u8{ 1, 1, 2, 3, 5, 8, 13 };
-    try std.testing.expect(std.mem.eql(u8, &send_buf, recv_buf[0..recv_len]));
-}
-
-fn tcpClient(info: *ServerInfo) !void {
-    const address = info.addr;
-    const xclient = try xev.TCP.init(address);
-    const client = aio.TCP.init(env.exec, xclient);
-    defer client.close() catch unreachable;
-    _ = try client.connect(address);
-    var send_buf = [_]u8{ 1, 1, 2, 3, 5, 8, 13 };
-    const send_len = try client.write(.{ .slice = &send_buf });
-    try std.testing.expectEqual(send_len, 7);
-}
-
-fn udpServer(info: *ServerInfo) !void {
-    var address = try std.net.Address.parseIp4("127.0.0.1", 0);
-    const xserver = try xev.UDP.init(address);
-
-    try xserver.bind(address);
-
-    var sock_len = address.getOsSockLen();
-    try std.posix.getsockname(xserver.fd, &address.any, &sock_len);
-    info.addr = address;
-
-    const server = aio.UDP.init(env.exec, xserver);
-
-    var recv_buf: [128]u8 = undefined;
-    const recv_len = try server.read(.{ .slice = &recv_buf });
-    var send_buf = [_]u8{ 1, 1, 2, 3, 5, 8, 13 };
-    try std.testing.expectEqual(recv_len, send_buf.len);
-    try std.testing.expect(std.mem.eql(u8, &send_buf, recv_buf[0..recv_len]));
-    try server.close();
-}
-
-fn udpClient(info: *ServerInfo) !void {
-    const xclient = try xev.UDP.init(info.addr);
-    const client = aio.UDP.init(env.exec, xclient);
-    var send_buf = [_]u8{ 1, 1, 2, 3, 5, 8, 13 };
-    const send_len = try client.write(info.addr, .{ .slice = &send_buf });
-    try std.testing.expectEqual(send_len, 7);
-    try client.close();
 }
 
 const NotifierState = struct {
