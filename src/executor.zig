@@ -63,34 +63,34 @@ pub fn Channel(comptime T: type, comptime config: ChannelConfig) type {
         q: Storage = .{},
         closed: bool = false,
 
-        space_notif: Condition,
-        value_notif: Condition,
+        space_notifier: Condition,
+        value_notifier: Condition,
 
         pub fn init(exec: ?*Executor) Self {
             const exec_ = getExec(exec);
             return .{
-                .space_notif = Condition.init(exec_),
-                .value_notif = Condition.init(exec_),
+                .space_notifier = Condition.init(exec_),
+                .value_notifier = Condition.init(exec_),
             };
         }
 
         pub fn close(self: *Self) void {
             self.closed = true;
-            self.value_notif.signal();
+            self.value_notifier.signal();
         }
 
         pub fn send(self: *Self, val: T) !void {
             if (self.closed) @panic("Cannot send on closed Channel");
-            while (self.q.space() == 0) self.space_notif.wait();
+            while (self.q.space() == 0) self.space_notifier.wait();
             try self.q.push(val);
-            self.value_notif.signal();
+            self.value_notifier.signal();
         }
 
         pub fn recv(self: *Self) ?T {
-            while (!(self.closed or self.q.len() != 0)) self.value_notif.wait();
+            while (!(self.closed or self.q.len() != 0)) self.value_notifier.wait();
             if (self.closed and self.q.len() == 0) return null;
             const out = self.q.pop().?;
-            self.space_notif.signal();
+            self.space_notifier.signal();
             return out;
         }
     };
