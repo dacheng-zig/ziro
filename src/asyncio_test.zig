@@ -418,7 +418,7 @@ fn recvr(chan: *UsizeChannel) usize {
 }
 
 fn chanMain() !usize {
-    var chan = UsizeChannel.init(null);
+    var chan = UsizeChannel.init(&env.exec.exec);
     const send_frame = try ziro.xasync(sender, .{ &chan, 6 }, null);
     defer send_frame.deinit();
     const recv_frame = try ziro.xasync(recvr, .{&chan}, null);

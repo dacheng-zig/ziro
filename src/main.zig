@@ -1,4 +1,6 @@
 pub usingnamespace @import("ziro.zig");
-pub usingnamespace @import("executor.zig");
+pub const Executor = @import("executor.zig").Executor;
+pub const Condition = @import("Condition.zig");
+pub const Channel = @import("channel.zig").Channel;
+pub const ChannelConfig = @import("channel.zig").ChannelConfig;
 pub const asyncio = @import("asyncio.zig");
-pub usingnamespace @import("waitgroup.zig");

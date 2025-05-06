@@ -89,7 +89,7 @@ test "channel" {
     ziro.initEnv(.{ .stack_allocator = std.testing.allocator, .executor = &exec });
     const start_i = ziro.xframe().id.invocation;
     const UsizeChannel = ziro.Channel(usize, .{});
-    var chan = UsizeChannel.init(null);
+    var chan = UsizeChannel.init(&exec);
     const send_frame = try ziro.xasync(sender, .{ &chan, 6 }, null);
     defer send_frame.deinit();
     const recv_frame = try ziro.xasync(recvr, .{&chan}, null);
@@ -109,7 +109,7 @@ test "buffered channel" {
     ziro.initEnv(.{ .stack_allocator = std.testing.allocator, .executor = &exec });
     const start_i = ziro.xframe().id.invocation;
     const UsizeChannel = ziro.Channel(usize, .{ .capacity = 6 });
-    var chan = UsizeChannel.init(null);
+    var chan = UsizeChannel.init(&exec);
     const send_frame = try ziro.xasync(sender, .{ &chan, 6 }, null);
     defer send_frame.deinit();
     const recv_frame = try ziro.xasync(recvr, .{&chan}, null);
