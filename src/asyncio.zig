@@ -106,8 +106,16 @@ pub const TCP = struct {
         .write = .send,
     });
 
-    pub fn init(exec: ?*Executor, tcp: xev.TCP) Self {
-        return .{ .exec = exec, .tcp = tcp };
+    pub fn init(exec: ?*Executor, addr: std.net.Address) !Self {
+        return .{ .exec = exec, .tcp = try xev.TCP.init(addr) };
+    }
+
+    pub fn bind(self: Self, addr: std.net.Address) !void {
+        return self.tcp.bind(addr);
+    }
+
+    pub fn listen(self: Self, backlog: u31) !void {
+        return self.tcp.listen(backlog);
     }
 
     fn stream(self: Self) xev.TCP {
@@ -192,6 +200,112 @@ pub const TCP = struct {
         const loop = getExec(self.exec).loop;
         var c: xev.Completion = .{};
         self.tcp.shutdown(loop, &c, Data, &data, &Data.callback);
+
+        try waitForCompletion(self.exec, &c);
+
+        return data.result;
+    }
+};
+
+pub const UDP = struct {
+    const Self = @This();
+
+    exec: ?*Executor,
+    udp: xev.UDP,
+
+    pub usingnamespace Stream(Self, xev.UDP, .{
+        .poll = true,
+        .close = true,
+        .read = .none,
+        .write = .none,
+    });
+
+    pub fn init(exec: ?*Executor, addr: std.net.Address) !Self {
+        return .{ .exec = exec, .udp = try xev.UDP.init(addr) };
+    }
+
+    pub fn bind(self: Self, addr: std.net.Address) !void {
+        return self.udp.bind(addr);
+    }
+
+    pub fn stream(self: Self) xev.UDP {
+        return self.udp;
+    }
+
+    const ReadResult = xev.ReadError!usize;
+    pub fn read(self: Self, buf: xev.ReadBuffer) !usize {
+        const ResultT = ReadResult;
+        const Data = struct {
+            result: ResultT = undefined,
+            frame: ?Frame = null,
+
+            fn callback(
+                userdata: ?*@This(),
+                l: *xev.Loop,
+                c: *xev.Completion,
+                s: *xev.UDP.State,
+                addr: std.net.Address,
+                udp: xev.UDP,
+                b: xev.ReadBuffer,
+                result: ResultT,
+            ) xev.CallbackAction {
+                _ = l;
+                _ = c;
+                _ = s;
+                _ = addr;
+                _ = udp;
+                _ = b;
+                const data = userdata.?;
+                data.result = result;
+                if (data.frame != null) ziro.xresume(data.frame.?);
+                return .disarm;
+            }
+        };
+
+        const loop = getExec(self.exec).loop;
+        var s: xev.UDP.State = undefined;
+        var c: xev.Completion = .{};
+        var data: Data = .{ .frame = ziro.xframe() };
+        self.udp.read(loop, &c, &s, buf, Data, &data, &Data.callback);
+
+        try waitForCompletion(self.exec, &c);
+
+        return data.result;
+    }
+
+    const WriteResult = xev.WriteError!usize;
+    pub fn write(self: Self, addr: std.net.Address, buf: xev.WriteBuffer) !usize {
+        const ResultT = WriteResult;
+        const Data = struct {
+            result: ResultT = undefined,
+            frame: ?Frame = null,
+
+            fn callback(
+                userdata: ?*@This(),
+                l: *xev.Loop,
+                c: *xev.Completion,
+                s: *xev.UDP.State,
+                udp: xev.UDP,
+                b: xev.WriteBuffer,
+                result: ResultT,
+            ) xev.CallbackAction {
+                _ = l;
+                _ = c;
+                _ = s;
+                _ = udp;
+                _ = b;
+                const data = userdata.?;
+                data.result = result;
+                if (data.frame != null) ziro.xresume(data.frame.?);
+                return .disarm;
+            }
+        };
+
+        const loop = getExec(self.exec).loop;
+        var s: xev.UDP.State = undefined;
+        var c: xev.Completion = .{};
+        var data: Data = .{ .frame = ziro.xframe() };
+        self.udp.write(loop, &c, &s, addr, buf, Data, &data, &Data.callback);
 
         try waitForCompletion(self.exec, &c);
 
@@ -344,8 +458,8 @@ pub const File = struct {
         .threadpool = true,
     });
 
-    pub fn init(exec: ?*Executor, file: xev.File) Self {
-        return .{ .exec = exec, .file = file };
+    pub fn init(exec: ?*Executor, file: std.fs.File) !Self {
+        return .{ .exec = exec, .file = try xev.File.init(file) };
     }
 
     fn stream(self: Self) xev.File {
@@ -433,8 +547,12 @@ pub const Process = struct {
     exec: ?*Executor,
     p: xev.Process,
 
-    pub fn init(exec: ?*Executor, p: xev.Process) Self {
-        return .{ .exec = exec, .p = p };
+    pub fn init(exec: ?*Executor, pid: std.posix.pid_t) !Self {
+        return .{ .exec = exec, .p = try xev.Process.init(pid) };
+    }
+
+    pub fn deinit(self: *Self) void {
+        self.p.deinit();
     }
 
     const WaitResult = xev.Process.WaitError!u32;
@@ -455,10 +573,14 @@ pub const AsyncNotification = struct {
     const Self = @This();
 
     exec: ?*Executor,
-    notif: xev.Async,
+    notifier: xev.Async,
 
-    pub fn init(exec: ?*Executor, notif: xev.Async) Self {
-        return .{ .exec = exec, .notif = notif };
+    pub fn init(exec: ?*Executor) !Self {
+        return .{ .exec = exec, .notifier = try xev.Async.init() };
+    }
+
+    pub fn deinit(self: *Self) void {
+        return self.notifier.deinit();
     }
 
     const WaitResult = xev.Async.WaitError!void;
@@ -469,113 +591,15 @@ pub const AsyncNotification = struct {
         var c: xev.Completion = .{};
         var data = Data.init();
 
-        self.notif.wait(loop, &c, Data, &data, &Data.callback);
-
-        try waitForCompletion(self.exec, &c);
-
-        return data.result;
-    }
-};
-
-pub const UDP = struct {
-    const Self = @This();
-
-    exec: ?*Executor,
-    udp: xev.UDP,
-
-    pub usingnamespace Stream(Self, xev.UDP, .{
-        .poll = true,
-        .close = true,
-        .read = .none,
-        .write = .none,
-    });
-
-    pub fn init(exec: ?*Executor, udp: xev.UDP) Self {
-        return .{ .exec = exec, .udp = udp };
-    }
-
-    pub fn stream(self: Self) xev.UDP {
-        return self.udp;
-    }
-
-    const ReadResult = xev.ReadError!usize;
-    pub fn read(self: Self, buf: xev.ReadBuffer) !usize {
-        const ResultT = ReadResult;
-        const Data = struct {
-            result: ResultT = undefined,
-            frame: ?Frame = null,
-
-            fn callback(
-                userdata: ?*@This(),
-                l: *xev.Loop,
-                c: *xev.Completion,
-                s: *xev.UDP.State,
-                addr: std.net.Address,
-                udp: xev.UDP,
-                b: xev.ReadBuffer,
-                result: ResultT,
-            ) xev.CallbackAction {
-                _ = l;
-                _ = c;
-                _ = s;
-                _ = addr;
-                _ = udp;
-                _ = b;
-                const data = userdata.?;
-                data.result = result;
-                if (data.frame != null) ziro.xresume(data.frame.?);
-                return .disarm;
-            }
-        };
-
-        const loop = getExec(self.exec).loop;
-        var s: xev.UDP.State = undefined;
-        var c: xev.Completion = .{};
-        var data: Data = .{ .frame = ziro.xframe() };
-        self.udp.read(loop, &c, &s, buf, Data, &data, &Data.callback);
+        self.notifier.wait(loop, &c, Data, &data, &Data.callback);
 
         try waitForCompletion(self.exec, &c);
 
         return data.result;
     }
 
-    const WriteResult = xev.WriteError!usize;
-    pub fn write(self: Self, addr: std.net.Address, buf: xev.WriteBuffer) !usize {
-        const ResultT = WriteResult;
-        const Data = struct {
-            result: ResultT = undefined,
-            frame: ?Frame = null,
-
-            fn callback(
-                userdata: ?*@This(),
-                l: *xev.Loop,
-                c: *xev.Completion,
-                s: *xev.UDP.State,
-                udp: xev.UDP,
-                b: xev.WriteBuffer,
-                result: ResultT,
-            ) xev.CallbackAction {
-                _ = l;
-                _ = c;
-                _ = s;
-                _ = udp;
-                _ = b;
-                const data = userdata.?;
-                data.result = result;
-                if (data.frame != null) ziro.xresume(data.frame.?);
-                return .disarm;
-            }
-        };
-
-        const loop = getExec(self.exec).loop;
-        var s: xev.UDP.State = undefined;
-        var c: xev.Completion = .{};
-        var data: Data = .{ .frame = ziro.xframe() };
-        self.udp.write(loop, &c, &s, addr, buf, Data, &data, &Data.callback);
-
-        try waitForCompletion(self.exec, &c);
-
-        return data.result;
+    pub fn notify(self: Self) !void {
+        return self.notifier.notify();
     }
 };
 

@@ -183,16 +183,15 @@ const ServerInfo = struct {
 
 fn tcpServer(info: *ServerInfo) !void {
     var address = try std.net.Address.parseIp4("127.0.0.1", 0);
-    const xserver = try xev.TCP.init(address);
+    const server = try aio.TCP.init(env.exec, address);
 
-    try xserver.bind(address);
-    try xserver.listen(1);
+    try server.bind(address);
+    try server.listen(1);
 
     var sock_len = address.getOsSockLen();
-    try std.posix.getsockname(xserver.fd, &address.any, &sock_len);
+    try std.posix.getsockname(server.tcp.fd, &address.any, &sock_len);
     info.addr = address;
 
-    const server = aio.TCP.init(env.exec, xserver);
     const conn = try server.accept();
     defer conn.close() catch unreachable;
     try server.close();
@@ -205,8 +204,7 @@ fn tcpServer(info: *ServerInfo) !void {
 
 fn tcpClient(info: *ServerInfo) !void {
     const address = info.addr;
-    const xclient = try xev.TCP.init(address);
-    const client = aio.TCP.init(env.exec, xclient);
+    const client = try aio.TCP.init(env.exec, address);
     defer client.close() catch unreachable;
     _ = try client.connect(address);
     var send_buf = [_]u8{ 1, 1, 2, 3, 5, 8, 13 };
@@ -237,15 +235,13 @@ test "aio tcp" {
 
 fn udpServer(info: *ServerInfo) !void {
     var address = try std.net.Address.parseIp4("127.0.0.1", 0);
-    const xserver = try xev.UDP.init(address);
+    const server = try aio.UDP.init(env.exec, address);
 
-    try xserver.bind(address);
+    try server.bind(address);
 
     var sock_len = address.getOsSockLen();
-    try std.posix.getsockname(xserver.fd, &address.any, &sock_len);
+    try std.posix.getsockname(server.udp.fd, &address.any, &sock_len);
     info.addr = address;
-
-    const server = aio.UDP.init(env.exec, xserver);
 
     var recv_buf: [128]u8 = undefined;
     const recv_len = try server.read(.{ .slice = &recv_buf });
@@ -256,8 +252,7 @@ fn udpServer(info: *ServerInfo) !void {
 }
 
 fn udpClient(info: *ServerInfo) !void {
-    const xclient = try xev.UDP.init(info.addr);
-    const client = aio.UDP.init(env.exec, xclient);
+    const client = try aio.UDP.init(env.exec, info.addr);
     var send_buf = [_]u8{ 1, 1, 2, 3, 5, 8, 13 };
     const send_len = try client.write(info.addr, .{ .slice = &send_buf });
     try std.testing.expectEqual(send_len, 7);
@@ -294,16 +289,14 @@ fn fileRW() !void {
     });
     defer f.close();
     defer std.fs.cwd().deleteFile(path) catch {};
-    const xfile = try xev.File.init(f);
-    const file = aio.File.init(env.exec, xfile);
+    const file = try aio.File.init(env.exec, f);
     var write_buf = [_]u8{ 1, 1, 2, 3, 5, 8, 13 };
     const write_len = try file.write(.{ .slice = &write_buf });
     try std.testing.expectEqual(write_len, write_buf.len);
     try f.sync();
     const f2 = try std.fs.cwd().openFile(path, .{});
     defer f2.close();
-    const xfile2 = try xev.File.init(f2);
-    const file2 = aio.File.init(env.exec, xfile2);
+    const file2 = try aio.File.init(env.exec, f2);
     var read_buf: [128]u8 = undefined;
     const read_len = try file2.read(.{ .slice = &read_buf });
     try std.testing.expectEqual(write_len, read_len);
@@ -321,10 +314,8 @@ fn processTest() !void {
     var child = std.process.Child.init(&.{ "sh", "-c", "exit 0" }, alloc);
     try child.spawn();
 
-    var xp = try xev.Process.init(child.id);
-    defer xp.deinit();
-
-    const p = aio.Process.init(env.exec, xp);
+    var p = try aio.Process.init(env.exec, child.id);
+    defer p.deinit();
     const rc = try p.wait();
     try std.testing.expectEqual(rc, 0);
 }
@@ -335,13 +326,30 @@ test "aio process" {
     try t.run(processTest);
 }
 
+const NotifierState = struct {
+    notifier: aio.AsyncNotification,
+    notified: bool = false,
+};
+
+fn asyncTest(state: *NotifierState) !void {
+    try state.notifier.wait();
+    state.notified = true;
+}
+
+fn asyncNotifier(state: *NotifierState) !void {
+    try state.notifier.notify();
+    try aio.sleep(env.exec, 10);
+    try std.testing.expect(state.notified);
+}
+
 fn asyncMain() !void {
     const stack_size = 1024 * 32;
-    var nstate = NotifierState{ .x = try xev.Async.init() };
+    var nstate = NotifierState{ .notifier = try aio.AsyncNotification.init(env.exec) };
+    defer nstate.notifier.deinit();
 
-    const stack = try ziro.stackAlloc(env.allocator, stack_size);
-    defer env.allocator.free(stack);
-    const co = try ziro.xasync(asyncTest, .{&nstate}, stack);
+    const stack1 = try ziro.stackAlloc(env.allocator, stack_size);
+    defer env.allocator.free(stack1);
+    const co = try ziro.xasync(asyncTest, .{&nstate}, stack1);
 
     const stack2 = try ziro.stackAlloc(env.allocator, stack_size);
     defer env.allocator.free(stack2);
@@ -355,23 +363,6 @@ test "aio async" {
     const t = try AioTest.init();
     defer t.deinit();
     try t.run(asyncMain);
-}
-
-const NotifierState = struct {
-    x: xev.Async,
-    notified: bool = false,
-};
-
-fn asyncTest(state: *NotifierState) !void {
-    const notif = aio.AsyncNotification.init(env.exec, state.x);
-    try notif.wait();
-    state.notified = true;
-}
-
-fn asyncNotifier(state: *NotifierState) !void {
-    try state.x.notify();
-    try aio.sleep(env.exec, 10);
-    try std.testing.expect(state.notified);
 }
 
 test "aio sleep env" {
@@ -445,11 +436,13 @@ test "aio mix channels" {
     try std.testing.expectEqual(sum, 15);
 }
 
-const TaskState = struct { called: bool = false };
+const TaskState = struct {
+    called: bool = false,
+};
 
 fn notifyAfterBlockingSleep(notifcation: *aio.AsyncNotification, state: *NotifierState) void {
     std.time.sleep(20 * std.time.ns_per_ms);
-    notifcation.notif.notify() catch unreachable;
+    notifcation.notifier.notify() catch unreachable;
     state.notified = true;
 }
 
@@ -460,11 +453,12 @@ fn asyncRecurseSleepAndNotification() !void {
     try std.Thread.Pool.init(pool, .{ .allocator = env.allocator });
     defer pool.deinit();
 
-    var nstate = NotifierState{ .x = try xev.Async.init() };
+    var nstate = NotifierState{ .notifier = try aio.AsyncNotification.init(env.exec) };
+    defer nstate.notifier.deinit();
     var tstate = TaskState{};
 
-    var notification = aio.AsyncNotification.init(env.exec, nstate.x);
-    defer notification.notif.deinit();
+    var notification = try aio.AsyncNotification.init(env.exec);
+    defer notification.notifier.deinit();
 
     const asyncTaskDoingAsyncSleep = try ziro.xasync(struct {
         fn call(exec: *aio.Executor, state: *TaskState) !void {
