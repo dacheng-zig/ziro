@@ -7,6 +7,8 @@ const Queue = @import("queue.zig").Queue;
 pub const Executor = struct {
     const Self = @This();
 
+    /// a wrapper contains user func and args;
+    /// also the pointer to next node within a data structure.
     pub const Func = struct {
         const FuncFn = *const fn (userdata: ?*anyopaque) void;
         func: FuncFn,
@@ -22,21 +24,24 @@ pub const Executor = struct {
         }
     };
 
-    /// ready queue
+    /// store Funcs that will run on next tick.
     readyq: Queue(Func) = .{},
 
     pub fn init() Self {
         return .{};
     }
 
+    /// push a Func to readyq that will run on next tick.
     pub fn runSoon(self: *Self, func: *Func) void {
         self.readyq.push(func);
     }
 
+    /// push Funcs to readyq that will run on next tick.
     pub fn runAllSoon(self: *Self, funcs: Queue(Func)) void {
         self.readyq.pushAll(funcs);
     }
 
+    /// run all Funcs from readyq.
     pub fn tick(self: *Self) bool {
         // Reset readyq so that adds run on next tick.
         var now = self.readyq;
@@ -53,19 +58,25 @@ pub const Executor = struct {
     }
 };
 
+/// serve as a bridge between the Executor's callback-based execution model
+/// and the coroutine-based execution model.
 pub const CoroResumer = struct {
     const Self = @This();
 
     coro: ziro.Frame,
 
+    /// construct a CoroResumer by capturing the current coroutine,
+    /// so that the coroutine can be resumed later.
     pub fn init() Self {
         return .{ .coro = ziro.xframe() };
     }
 
+    /// construct a Func that will resume the coroutine.
     pub fn func(self: *Self) Executor.Func {
         return .{ .func = Self.callback, .userdata = self };
     }
 
+    /// resume the coroutine.
     pub fn callback(ud: ?*anyopaque) void {
         const self: *Self = @ptrCast(@alignCast(ud));
         ziro.xresume(self.coro);
