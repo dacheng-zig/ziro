@@ -2,7 +2,7 @@
 
 const std = @import("std");
 
-const ziro = @import("ziro.zig");
+const Executor = @import("executor.zig").Executor;
 const Condition = @import("Condition.zig");
 
 notifier: Condition,
@@ -12,9 +12,9 @@ counter: std.atomic.Value(usize) = std.atomic.Value(usize).init(0),
 const Self = @This();
 
 /// Initialize a new WaitGroup
-pub fn init(exec: *ziro.Executor) Self {
+pub fn init(exec: *Executor) Self {
     return .{
-        .notifier = ziro.Condition.init(exec),
+        .notifier = Condition.init(exec),
     };
 }
 
