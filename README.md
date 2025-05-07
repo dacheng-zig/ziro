@@ -1,6 +1,6 @@
-# zigcoro
+# ziro
 
-Async Zig as a library using stackful asymmetric coroutines.
+A Zig Coroutine library using stackful asymmetric coroutines.
 
 Supports async IO via [`libxev`][libxev].
 
@@ -18,8 +18,8 @@ Async IO supported on Linux {`x86_64`, `aarch64`}, and Mac {`x86_64`, `aarch64`}
 
 `build.zig.zon`
 ```zig
-.zigcoro = .{
-  .url = "git+https://github.com/rsepassi/zigcoro#<commit hash>",
+.ziro = .{
+  .url = "git+https://github.com/dacheng-zig/ziro#<commit hash>",
   .hash = "<hash>",
 },
 ```
@@ -51,6 +51,11 @@ xresume(frame)
 xsuspend()
 xsuspendBlock(func, ptr)
 
+Condition
+  init(Executor)
+  broadcast()
+  signal()
+  wait()
 Channel(T, .{.capacity = n})
   init(Executor)
   send(T)
@@ -59,6 +64,7 @@ Channel(T, .{.capacity = n})
 Executor
   init()
   runSoon(Func)
+  runAllSoon(Func)
   tick()->bool
 
 // Optional thread-local environment
@@ -130,7 +136,7 @@ AsyncNotification
 
 It's trivial to switch to Zig's async/await whenever it's ready.
 
-Translation (zigcoro then Zig):
+Translation (ziro then Zig):
 
 ```zig
 // async
@@ -211,7 +217,7 @@ number of coroutines, you'll notice a cliff in performance
 or OOM. This will be highly dependent on the amount of free
 memory on the system.
 
-Note also that zigcoro's default stack size is 4096B, which
+Note also that ziro's default stack size is 4096B, which
 is the typical size of a single page on many systems.
 
 From a run on an AMD Ryzen Threadripper PRO 5995WX:
