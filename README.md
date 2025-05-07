@@ -36,7 +36,7 @@ my_lib.addModule("ziro", ziro);
 
 Alpha.
 
-Async/await, suspend/resume, Channels, and async IO are all functional and (CI) tested.
+async/await, suspend/resume, Channel, WaitGroup, and async IO are all functional and (CI) tested.
 
 See [future work](#future-work) for more.
 
@@ -61,6 +61,12 @@ Channel(T, .{.capacity = n})
   send(T)
   recv->?T
   close()
+WaitGroup
+  init(Executor)
+  inc()
+  add(usize)
+  done()
+  wait()
 Executor
   init()
   runSoon(Func)
