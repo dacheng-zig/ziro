@@ -15,8 +15,9 @@ pub fn init(exec: *Executor) Self {
 }
 
 pub fn broadcast(self: *Self) void {
-    std.debug.assert(!self.notified);
-    self.exec.runAllSoon(self.waiters);
+    const waiters = self.waiters;
+    self.waiters = .{};
+    self.exec.runAllSoon(waiters);
 }
 
 pub fn signal(self: *Self) void {
