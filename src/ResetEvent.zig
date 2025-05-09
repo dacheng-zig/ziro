@@ -1,12 +1,8 @@
 const std = @import("std");
 
-const CoroResumer = @import("executor.zig").CoroResumer;
-const Executor = @import("executor.zig").Executor;
-const Queue = @import("queue.zig").Queue;
 const ziro = @import("ziro.zig");
 
 state: std.atomic.Value(u8) = std.atomic.Value(u8).init(unset),
-exec: *Executor,
 
 const unset = 0;
 const waiting = 1;
@@ -14,10 +10,8 @@ const is_set = 2;
 
 const Self = @This();
 
-pub fn init(exec: *Executor) Self {
-    return .{
-        .exec = exec,
-    };
+pub fn init() Self {
+    return .{};
 }
 
 pub fn isSet(self: *Self) bool {

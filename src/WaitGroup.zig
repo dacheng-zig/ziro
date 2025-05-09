@@ -2,7 +2,6 @@
 
 const std = @import("std");
 
-const Executor = @import("executor.zig").Executor;
 const ResetEvent = @import("ResetEvent.zig");
 
 counter: std.atomic.Value(usize) = std.atomic.Value(usize).init(0),
@@ -10,9 +9,9 @@ event: ResetEvent,
 
 const Self = @This();
 
-pub fn init(exec: *Executor) Self {
+pub fn init() Self {
     return .{
-        .event = ResetEvent.init(exec),
+        .event = ResetEvent.init(),
     };
 }
 
