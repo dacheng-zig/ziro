@@ -7,17 +7,17 @@ pub fn build(b: *std.Build) !void {
     const default_stack_size = b.option(usize, "ziro_default_stack_size", "Default stack size for coroutines") orelse 1024 * 4;
     const debug_log_level = b.option(usize, "ziro_debug_log_level", "Debug log level for coroutines") orelse 0;
 
-    // Deps
+    // xev dependency for async io
     const xev = b.dependency("libxev", .{}).module("xev");
 
-    // Module
+    // create dynamic module 'ziro_options'
     const ziro_options = b.addOptions();
     ziro_options.addOption(usize, "default_stack_size", default_stack_size);
     ziro_options.addOption(usize, "debug_log_level", debug_log_level);
     const ziro_options_module = ziro_options.createModule();
 
     const ziro = b.addModule("ziro", .{
-        .root_source_file = b.path("src/main.zig"),
+        .root_source_file = b.path("src/root.zig"),
         .imports = &.{
             .{ .name = "xev", .module = xev },
             .{ .name = "ziro_options", .module = ziro_options_module },
@@ -43,7 +43,6 @@ pub fn build(b: *std.Build) !void {
         ziro_test_internal.root_module.addImport("ziro_options", ziro_options_module);
         ziro_test_internal.linkLibC();
 
-        // Test step
         const test_step = b.step("test-ziro", "Run tests");
         test_step.dependOn(&b.addRunArtifact(ziro_test).step);
         test_step.dependOn(&b.addRunArtifact(ziro_test_internal).step);
@@ -60,13 +59,11 @@ pub fn build(b: *std.Build) !void {
         aio_test.root_module.addImport("xev", xev);
         aio_test.linkLibC();
 
-        // Test step
         const test_step = b.step("test-aio", "Run async io tests");
         test_step.dependOn(&b.addRunArtifact(aio_test).step);
     }
 
     {
-        // Benchmark
         const bench = b.addExecutable(.{
             .name = "benchmark",
             .root_source_file = b.path("benchmark.zig"),
