@@ -1,8 +1,9 @@
 const std = @import("std");
 
-const ziro = @import("ziro.zig");
 const ziro_options = @import("ziro_options");
+
 const Queue = @import("queue.zig").Queue;
+const ziro = @import("ziro.zig");
 
 pub const Executor = struct {
     const Self = @This();

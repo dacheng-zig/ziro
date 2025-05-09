@@ -1,14 +1,14 @@
 const std = @import("std");
 
-const ziro = @import("ziro.zig");
-const Executor = @import("executor.zig").Executor;
 const CoroResumer = @import("executor.zig").CoroResumer;
+const Executor = @import("executor.zig").Executor;
 const Queue = @import("queue.zig").Queue;
+const ziro = @import("ziro.zig");
 
 const Self = @This();
 
-exec: *Executor,
 waiters: Queue(Executor.Func) = .{},
+exec: *Executor,
 
 pub fn init(exec: *Executor) Self {
     return .{ .exec = exec };
