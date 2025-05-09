@@ -3,55 +3,50 @@
 const std = @import("std");
 
 const Executor = @import("executor.zig").Executor;
-const Condition = @import("Condition.zig");
+const ResetEvent = @import("ResetEvent.zig");
 
-notifier: Condition,
-notified: bool = false,
 counter: std.atomic.Value(usize) = std.atomic.Value(usize).init(0),
+event: ResetEvent,
 
 const Self = @This();
 
-/// Initialize a new WaitGroup
 pub fn init(exec: *Executor) Self {
     return .{
-        .notifier = Condition.init(exec),
+        .event = ResetEvent.init(exec),
     };
 }
 
-/// add delta to the WaitGroup counter.
-pub fn add(self: *Self, delta: usize) void {
-    _ = self.counter.fetchAdd(delta, .monotonic);
-}
-
-/// Increment the WaitGroup counter by one
-pub fn inc(self: *Self) void {
+pub fn start(self: *Self) void {
     _ = self.counter.fetchAdd(1, .monotonic);
 }
 
-/// Decrement the WaitGroup counter by one
-pub fn done(self: *Self) void {
+pub fn startMany(self: *Self, delta: usize) void {
+    _ = self.counter.fetchAdd(delta, .monotonic);
+}
+
+pub fn finish(self: *Self) void {
     const prev = self.counter.fetchSub(1, .monotonic);
 
-    // If this was the last counter, wake up all waiting coroutines
     if (prev == 1) {
-        self.wake();
+        self.event.set();
     } else if (prev == 0) {
         @panic("WaitGroup counter negative");
     }
 }
 
-/// suspend until notified due to the counter becomes zero
 pub fn wait(self: *Self) void {
-    // quick path
     if (self.counter.load(.monotonic) == 0) {
         return;
     }
 
-    while (!self.notified) {
-        self.notifier.wait();
-    }
+    self.event.wait();
 }
 
-fn wake(self: *Self) void {
-    self.notified = true;
+pub fn reset(self: *Self) void {
+    self.counter.store(0, .monotonic);
+    self.event.reset();
+}
+
+pub fn isDone(self: *Self) bool {
+    return self.counter.load(.monotonic) == 0;
 }
