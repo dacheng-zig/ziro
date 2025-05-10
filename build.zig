@@ -17,7 +17,7 @@ pub fn build(b: *std.Build) !void {
     const ziro_options_module = ziro_options.createModule();
 
     const ziro = b.addModule("ziro", .{
-        .root_source_file = b.path("src/root.zig"),
+        .root_source_file = b.path("src/ziro.zig"),
         .imports = &.{
             .{ .name = "xev", .module = xev },
             .{ .name = "ziro_options", .module = ziro_options_module },

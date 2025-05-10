@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const ziro = @import("ziro.zig");
+const ziro = @import("../ziro.zig");
 
 state: std.atomic.Value(u8) = std.atomic.Value(u8).init(unset),
 

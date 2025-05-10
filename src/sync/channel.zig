@@ -1,6 +1,7 @@
-const ArrayQueue = @import("queue.zig").ArrayQueue;
+const ziro = @import("../ziro.zig");
+const ArrayQueue = ziro.ArrayQueue;
+const Executor = ziro.Executor;
 const Condition = @import("Condition.zig");
-const Executor = @import("executor.zig").Executor;
 
 pub const ChannelConfig = struct {
     capacity: usize = 1,

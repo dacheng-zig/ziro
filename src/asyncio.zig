@@ -2,7 +2,6 @@ const std = @import("std");
 
 const xev = @import("xev");
 
-const CoroExecutor = @import("executor.zig").Executor;
 const ziro = @import("ziro.zig");
 const Frame = ziro.Frame;
 
@@ -26,7 +25,7 @@ pub fn initEnv(e: EnvArg) void {
 
 pub const Executor = struct {
     loop: *xev.Loop,
-    exec: CoroExecutor = .{},
+    exec: ziro.Executor = .{},
     pub fn init(loop: *xev.Loop) @This() {
         return .{ .loop = loop };
     }

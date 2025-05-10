@@ -1,13 +1,11 @@
 const std = @import("std");
 
-const CoroResumer = @import("executor.zig").CoroResumer;
-const Executor = @import("executor.zig").Executor;
-const Queue = @import("queue.zig").Queue;
-const ziro = @import("ziro.zig");
+const ziro = @import("../ziro.zig");
+const Executor = ziro.Executor;
 
 const Self = @This();
 
-waiters: Queue(Executor.Func) = .{},
+waiters: ziro.Queue(Executor.Func) = .{},
 exec: *Executor,
 
 pub fn init(exec: *Executor) Self {
@@ -25,7 +23,7 @@ pub fn signal(self: *Self) void {
 }
 
 pub fn wait(self: *Self) void {
-    var resumer = CoroResumer.init();
+    var resumer = ziro.CoroResumer.init();
     var func = resumer.func();
     self.waiters.push(&func);
     ziro.xsuspend();
