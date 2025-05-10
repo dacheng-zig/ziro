@@ -25,7 +25,7 @@ const debug_log_level = ziro_options.debug_log_level;
 const default_stack_size = ziro_options.default_stack_size;
 
 const base = @import("ziro_base.zig");
-const stack_alignment = base.stack_alignment;
+pub const stack_alignment = base.stack_alignment;
 
 const log = std.log.scoped(.ziro);
 
