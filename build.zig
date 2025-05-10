@@ -82,4 +82,25 @@ pub fn build(b: *std.Build) !void {
         bench_step.dependOn(&bench_run.step);
         bench_step.dependOn(&b.addInstallArtifact(bench, .{}).step);
     }
+
+    {
+        const sleep_example = b.addExecutable(.{
+            .name = "example-sleep",
+            .root_source_file = b.path("examples/sleep.zig"),
+            .target = target,
+            .optimize = optimize,
+        });
+        sleep_example.root_module.addImport("ziro", ziro);
+        sleep_example.root_module.addImport("xev", xev);
+        sleep_example.linkLibC();
+
+        const sleep_run = b.addRunArtifact(sleep_example);
+        if (b.args) |args| {
+            sleep_run.addArgs(args);
+        }
+
+        const sleep_step = b.step("example-sleep", "Run sleep example");
+        sleep_step.dependOn(&sleep_run.step);
+        sleep_step.dependOn(&b.addInstallArtifact(sleep_example, .{}).step);
+    }
 }
