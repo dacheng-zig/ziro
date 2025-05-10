@@ -1,11 +1,8 @@
 const std = @import("std");
-const http = std.http;
 
 const xev = @import("xev");
 const ziro = @import("ziro");
 const aio = ziro.asyncio;
-
-var env: struct { allocator: std.mem.Allocator, exec: *aio.Executor } = undefined;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}).init;
@@ -39,7 +36,7 @@ pub fn main() !void {
         .default_stack_size = 1024 * 8,
     });
 
-    try aio.run(executor, mainTask, .{allocator}, null);
+    try aio.run(null, mainTask, .{allocator}, null);
 }
 
 fn mainTask(allocator: std.mem.Allocator) !void {

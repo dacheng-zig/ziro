@@ -19,7 +19,7 @@ pub fn initEnv(e: EnvArg) void {
     ziro.initEnv(.{
         .stack_allocator = e.stack_allocator,
         .default_stack_size = e.default_stack_size,
-        .executor = if (e.executor) |ex| &ex.exec else null, // TODO
+        .executor = if (e.executor) |ex| &ex.exec else null,
     });
 }
 
