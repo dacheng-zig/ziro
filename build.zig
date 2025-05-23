@@ -84,6 +84,27 @@ pub fn build(b: *std.Build) !void {
     }
 
     {
+        const example_exe = b.addExecutable(.{
+            .name = "example-http",
+            .root_source_file = b.path("examples/http.zig"),
+            .target = target,
+            .optimize = optimize,
+        });
+        example_exe.root_module.addImport("ziro", ziro);
+        example_exe.root_module.addImport("xev", xev);
+        example_exe.linkLibC();
+
+        const sleep_run = b.addRunArtifact(example_exe);
+        if (b.args) |args| {
+            sleep_run.addArgs(args);
+        }
+
+        const example_step = b.step("example-http", "Run http example");
+        example_step.dependOn(&sleep_run.step);
+        example_step.dependOn(&b.addInstallArtifact(example_exe, .{}).step);
+    }
+
+    {
         const sleep_example = b.addExecutable(.{
             .name = "example-sleep",
             .root_source_file = b.path("examples/sleep.zig"),
