@@ -1,4 +1,4 @@
-const ziro = @import("../ziro.zig");
+const ziro = @import("../lib.zig");
 const ArrayQueue = ziro.ArrayQueue;
 const Executor = ziro.Executor;
 const Condition = @import("Condition.zig");

@@ -1,7 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-const Error = @import("ziro.zig").Error;
+const Error = @import("lib.zig").Error;
 
 const ArchInfo = struct {
     num_registers: usize,

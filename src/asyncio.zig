@@ -2,7 +2,7 @@ const std = @import("std");
 
 const xev = @import("xev");
 
-const ziro = @import("ziro.zig");
+const ziro = @import("lib.zig");
 const Frame = ziro.Frame;
 
 const Env = struct {

@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const ziro = @import("../ziro.zig");
+const ziro = @import("../lib.zig");
 const Executor = ziro.Executor;
 
 const Self = @This();
