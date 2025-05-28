@@ -24,30 +24,29 @@ pub fn main() !void {
         .default_stack_size = STACK_SIZE,
     });
 
-    // run main coroutine
-    try aio.run(&executor, serverFunc, .{&executor}, null);
-}
-
-fn serverFunc(executor: *aio.Executor) !void {
     const address = try std.net.Address.parseIp("127.0.0.1", 8008);
-    var server = try aio.TCP.init(executor, address);
-
+    var server = try aio.TCP.init(&executor, address);
     try server.bind(address);
     try server.listen(1024);
-
     log.info("HTTP server listening on {}", .{address});
 
+    // run main coroutine
+    try aio.run(&executor, serve, .{server}, null);
+}
+
+fn serve(server: aio.TCP) !void {
     while (true) {
+        // try to accept, wait when no connection comes in
         const conn = try server.accept();
 
         // spawn a new coroutine to handle http connection
-        _ = ziro.xasync(handleConnection, .{conn}, null) catch |err| {
+        _ = ziro.xasync(handle, .{conn}, null) catch |err| {
             log.err("connection error: {}", .{err});
         };
     }
 }
 
-fn handleConnection(conn: aio.TCP) !void {
+fn handle(conn: aio.TCP) !void {
     defer conn.close() catch unreachable;
 
     var buffer: [1024 * 8]u8 = undefined;
