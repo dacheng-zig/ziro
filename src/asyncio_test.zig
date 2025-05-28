@@ -8,24 +8,16 @@ threadlocal var env: struct { allocator: std.mem.Allocator, exec: *aio.Executor 
 
 const AioTest = struct {
     allocator: std.mem.Allocator,
-    tp: *xev.ThreadPool,
-    loop: *xev.Loop,
     exec: *aio.Executor,
     stacks: []u8,
 
     fn init() !@This() {
         const allocator = std.testing.allocator;
 
-        // Allocate on heap for pointer stability
-        var tp = try allocator.create(xev.ThreadPool);
-        var loop = try allocator.create(xev.Loop);
-        var exec = try allocator.create(aio.Executor);
-        _ = &tp;
-        _ = &loop;
-        _ = &exec;
-        tp.* = xev.ThreadPool.init(.{});
-        loop.* = try xev.Loop.init(.{ .thread_pool = tp });
-        exec.* = aio.Executor.init(loop);
+        // init async io executor, this needs stable memory pointer
+        const exec = try allocator.create(aio.Executor);
+        exec.* = try aio.Executor.init(allocator);
+
         const stack_size = 1024 * 128;
         const num_stacks = 5;
         const stacks = try allocator.alignedAlloc(u8, ziro.stack_alignment, num_stacks * stack_size);
@@ -44,21 +36,15 @@ const AioTest = struct {
 
         return .{
             .allocator = allocator,
-            .tp = tp,
-            .loop = loop,
             .exec = exec,
             .stacks = stacks,
         };
     }
 
     fn deinit(self: @This()) void {
-        self.loop.deinit();
-        self.tp.shutdown();
-        self.tp.deinit();
-        self.allocator.destroy(self.tp);
-        self.allocator.destroy(self.loop);
-        self.allocator.destroy(self.exec);
+        self.exec.deinit(self.allocator);
         self.allocator.free(self.stacks);
+        self.allocator.destroy(self.exec);
     }
 
     fn run(self: @This(), func: anytype) !void {
@@ -402,7 +388,7 @@ test "aio concurrent sleep env" {
     try std.testing.expect(after < (before + 23));
 }
 
-const UsizeChannel = ziro.Channel(usize, .{ .capacity = 10 });
+const UsizeChannel = ziro.sync.Channel(usize, .{ .capacity = 10 });
 
 fn sender(chan: *UsizeChannel, count: usize) !void {
     defer chan.close();

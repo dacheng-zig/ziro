@@ -4,48 +4,33 @@ const xev = @import("xev");
 const ziro = @import("ziro");
 const aio = ziro.asyncio;
 
-const log = std.log.scoped(.@"ziro/http");
-
-threadlocal var env: struct {
-    allocator: std.mem.Allocator,
-    executor: aio.Executor,
-} = undefined;
+const log = std.log.scoped(.@"ziro/example/http");
 
 const STACK_SIZE: usize = 1024 * 64;
 const HTTP_RESPONSE = "HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nContent-Length: 13\r\nContent-Type: text/plain\r\n\r\nHello World\r\n";
 
 pub fn main() !void {
-    // Initialize allocator
+    // init allocator
     var gpa = std.heap.GeneralPurposeAllocator(.{}).init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    // Create event loop
-    var tp = xev.ThreadPool.init(.{});
-    var loop = try xev.Loop.init(.{ .thread_pool = &tp });
-    defer loop.deinit();
-
-    // Create async io executor
-    var executor = aio.Executor.init(&loop);
-
+    // init async io executor and env
+    var executor = try aio.Executor.init(allocator);
+    defer executor.deinit(allocator);
     aio.initEnv(.{
         .executor = &executor,
         .stack_allocator = allocator,
         .default_stack_size = STACK_SIZE,
     });
 
-    // save to `env` for later use
-    env = .{
-        .allocator = allocator,
-        .executor = executor,
-    };
-
-    try aio.run(&env.executor, serverFunc, .{}, null);
+    // run main coroutine
+    try aio.run(&executor, serverFunc, .{&executor}, null);
 }
 
-fn serverFunc() !void {
-    const address = try std.net.Address.parseIp("127.0.0.1", 8080);
-    var server = try aio.TCP.init(&env.executor, address);
+fn serverFunc(executor: *aio.Executor) !void {
+    const address = try std.net.Address.parseIp("127.0.0.1", 8008);
+    var server = try aio.TCP.init(executor, address);
 
     try server.bind(address);
     try server.listen(1024);

@@ -5,38 +5,22 @@ const ziro = @import("ziro");
 const aio = ziro.asyncio;
 
 pub fn main() !void {
+    // init allocator
     var gpa = std.heap.GeneralPurposeAllocator(.{}).init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    // init thread pool (used by xev event loop)
-    var tp = try allocator.create(xev.ThreadPool);
-    defer {
-        tp.shutdown();
-        tp.deinit();
-        allocator.destroy(tp);
-    }
-    tp.* = xev.ThreadPool.init(.{});
-
-    // init xev event loop
-    var loop = try allocator.create(xev.Loop);
-    defer {
-        loop.deinit();
-        allocator.destroy(loop);
-    }
-    loop.* = try xev.Loop.init(.{ .thread_pool = tp });
-
-    // init async io executor and async io env
-    const executor = try allocator.create(aio.Executor);
-    defer allocator.destroy(executor);
-    executor.* = aio.Executor.init(loop);
+    // init async io executor and env
+    var executor = try aio.Executor.init(allocator);
+    defer executor.deinit(allocator);
     aio.initEnv(.{
-        .executor = executor,
+        .executor = &executor,
         .stack_allocator = allocator,
         .default_stack_size = 1024 * 8,
     });
 
-    try aio.run(null, mainTask, .{allocator}, null);
+    // run main coroutine
+    try aio.run(&executor, mainTask, .{allocator}, null);
 }
 
 fn mainTask(allocator: std.mem.Allocator) !void {

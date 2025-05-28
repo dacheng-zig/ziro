@@ -23,11 +23,38 @@ pub fn initEnv(e: EnvArg) void {
     });
 }
 
+/// Async IO executor, wraps coroutine executor.
 pub const Executor = struct {
     loop: *xev.Loop,
+    tp: ?*xev.ThreadPool = null,
     exec: ziro.Executor = .{},
-    pub fn init(loop: *xev.Loop) @This() {
-        return .{ .loop = loop };
+
+    const Self = @This();
+
+    pub fn init(allocator: std.mem.Allocator) !Self {
+        const tp = try allocator.create(xev.ThreadPool);
+        tp.* = xev.ThreadPool.init(.{});
+
+        const loop = try allocator.create(xev.Loop);
+        loop.* = try xev.Loop.init(.{ .thread_pool = tp });
+
+        return .{
+            .loop = loop,
+            .tp = tp,
+        };
+    }
+
+    pub fn deinit(self: *Executor, allocator: std.mem.Allocator) void {
+        if (self.tp) |tp| {
+            tp.shutdown();
+            tp.deinit();
+            allocator.destroy(tp);
+        }
+
+        {
+            self.loop.deinit();
+            allocator.destroy(self.loop);
+        }
     }
 
     fn tick(self: *@This()) !void {
