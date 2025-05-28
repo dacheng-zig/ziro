@@ -167,7 +167,6 @@ const Coro = struct {
         Active,
         Done,
     };
-    const Signature = VoidSignature;
 
     /// Function to run in the coroutine
     func: *const fn () void,
@@ -249,10 +248,6 @@ const Coro = struct {
         });
     }
 };
-
-const VoidSignature = CoroT.Signature.init((struct {
-    fn func() void {}
-}).func, .{});
 
 const CoroT = struct {
     const Options = struct {
