@@ -6,9 +6,9 @@ const aio = ziro.asyncio;
 
 pub fn main() !void {
     // init allocator
-    var gpa = std.heap.GeneralPurposeAllocator(.{}).init;
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    var dbgalloc = std.heap.DebugAllocator(.{}).init;
+    defer _ = dbgalloc.deinit();
+    const allocator = dbgalloc.allocator();
 
     // init async io executor and env
     var executor = try aio.Executor.init(allocator);
