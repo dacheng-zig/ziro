@@ -199,7 +199,7 @@ pub const TCP = struct {
         return data.result;
     }
 
-    const ShutdownResult = xev.TCP.ShutdownError!void;
+    const ShutdownResult = xev.ShutdownError!void;
     pub fn shutdown(self: Self) ShutdownResult {
         const ResultT = ShutdownResult;
         const Data = struct {
