@@ -20,10 +20,10 @@ pub fn main() !void {
     });
 
     // run main coroutine
-    try aio.run(&executor, mainTask, .{allocator}, null);
+    try aio.run(&executor, mainco, .{allocator}, null);
 }
 
-fn mainTask(allocator: std.mem.Allocator) !void {
+fn mainco(allocator: std.mem.Allocator) !void {
     var wg = ziro.sync.WaitGroup.init();
 
     const num_tasks: usize = 4;

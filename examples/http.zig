@@ -24,6 +24,7 @@ pub fn main() !void {
         .default_stack_size = STACK_SIZE,
     });
 
+    // server listen
     const address = try std.net.Address.parseIp("127.0.0.1", 8008);
     var server = try aio.TCP.init(&executor, address);
     try server.bind(address);
@@ -51,9 +52,9 @@ fn handle(conn: aio.TCP) !void {
 
     var buffer: [1024 * 8]u8 = undefined;
 
-    // 1 tcp connection, many http request
+    // one tcp connection, may come with many http requests
     while (true) {
-        // handle request
+        // handle each request: one read, one write
         {
             _ = conn.read(.{ .slice = &buffer }) catch |e| {
                 log.err("read error: {}", .{e});
