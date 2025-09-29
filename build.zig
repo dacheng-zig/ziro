@@ -18,6 +18,8 @@ pub fn build(b: *std.Build) !void {
 
     const ziro = b.addModule("ziro", .{
         .root_source_file = b.path("src/lib.zig"),
+        .target = target,
+        .optimize = optimize,
         .imports = &.{
             .{ .name = "xev", .module = xev },
             .{ .name = "ziro_options", .module = ziro_options_module },
@@ -27,18 +29,28 @@ pub fn build(b: *std.Build) !void {
     {
         const ziro_test = b.addTest(.{
             .name = "zirotest",
-            .root_source_file = b.path("src/ziro_test.zig"),
-            .target = target,
-            .optimize = optimize,
+            .root_module = b.addModule(
+                "zirotest",
+                .{
+                    .root_source_file = b.path("src/ziro_test.zig"),
+                    .target = target,
+                    .optimize = optimize,
+                },
+            ),
         });
         ziro_test.root_module.addImport("ziro", ziro);
         ziro_test.linkLibC();
 
         const ziro_test_internal = b.addTest(.{
             .name = "zirotest-internal",
-            .root_source_file = b.path("src/lib.zig"),
-            .target = target,
-            .optimize = optimize,
+            .root_module = b.addModule(
+                "ziro_test_internal",
+                .{
+                    .root_source_file = b.path("src/lib.zig"),
+                    .target = target,
+                    .optimize = optimize,
+                },
+            ),
         });
         ziro_test_internal.root_module.addImport("ziro_options", ziro_options_module);
         ziro_test_internal.linkLibC();
@@ -51,9 +63,14 @@ pub fn build(b: *std.Build) !void {
     {
         const aio_test = b.addTest(.{
             .name = "aiotest",
-            .root_source_file = b.path("src/asyncio_test.zig"),
-            .target = target,
-            .optimize = optimize,
+            .root_module = b.addModule(
+                "aiotest",
+                .{
+                    .root_source_file = b.path("src/asyncio_test.zig"),
+                    .target = target,
+                    .optimize = optimize,
+                },
+            ),
         });
         aio_test.root_module.addImport("ziro", ziro);
         aio_test.root_module.addImport("xev", xev);
@@ -66,9 +83,14 @@ pub fn build(b: *std.Build) !void {
     {
         const bench = b.addExecutable(.{
             .name = "benchmark",
-            .root_source_file = b.path("benchmark.zig"),
-            .target = target,
-            .optimize = .ReleaseFast,
+            .root_module = b.addModule(
+                "benchmark",
+                .{
+                    .root_source_file = b.path("benchmark.zig"),
+                    .target = target,
+                    .optimize = optimize,
+                },
+            ),
         });
         bench.root_module.addImport("ziro", ziro);
         bench.linkLibC();
@@ -86,9 +108,14 @@ pub fn build(b: *std.Build) !void {
     {
         const example_exe = b.addExecutable(.{
             .name = "example-http",
-            .root_source_file = b.path("examples/http.zig"),
-            .target = target,
-            .optimize = optimize,
+            .root_module = b.addModule(
+                "example-http",
+                .{
+                    .root_source_file = b.path("examples/http.zig"),
+                    .target = target,
+                    .optimize = optimize,
+                },
+            ),
         });
         example_exe.root_module.addImport("ziro", ziro);
         example_exe.root_module.addImport("xev", xev);
@@ -107,9 +134,14 @@ pub fn build(b: *std.Build) !void {
     {
         const sleep_example = b.addExecutable(.{
             .name = "example-sleep",
-            .root_source_file = b.path("examples/sleep.zig"),
-            .target = target,
-            .optimize = optimize,
+            .root_module = b.addModule(
+                "example-sleep",
+                .{
+                    .root_source_file = b.path("examples/sleep.zig"),
+                    .target = target,
+                    .optimize = optimize,
+                },
+            ),
         });
         sleep_example.root_module.addImport("ziro", ziro);
         sleep_example.root_module.addImport("xev", xev);

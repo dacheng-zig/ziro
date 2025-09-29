@@ -2,6 +2,7 @@
     .name = .ziro,
     .version = "0.0.0",
     .fingerprint = 0xa2c408f6d87f9380,
+    .minimum_zig_version = "0.15.1",
 
     .dependencies = .{
         .libxev = .{

@@ -107,7 +107,7 @@ pub const FrameT = CoroT.fromFunc;
 /// Allocate a stack suitable for coroutine usage.
 /// Caller is responsible for freeing memory.
 pub fn stackAlloc(allocator: std.mem.Allocator, size: ?usize) !StackT {
-    return try allocator.alignedAlloc(u8, stack_alignment, size orelse default_stack_size);
+    return try allocator.alignedAlloc(u8, std.mem.Alignment.fromByteUnits(stack_alignment), size orelse default_stack_size);
 }
 
 /// True if within a coroutine, false if at top-level.
@@ -214,7 +214,7 @@ const Coro = struct {
         return self;
     }
 
-    fn runcoro(from: *base.Coro, this: *base.Coro) callconv(.C) noreturn {
+    fn runcoro(from: *base.Coro, this: *base.Coro) callconv(.c) noreturn {
         const from_coro: *Coro = @fieldParentPtr("impl", from);
         const this_coro: *Coro = @fieldParentPtr("impl", this);
         if (debug_log_level >= 3) {
@@ -300,11 +300,12 @@ const CoroT = struct {
         const InnerStorage = struct {
             args: Sig.ArgsT,
             /// Values that are produced during coroutine execution
-            value: union {
+            value: union(enum) {
                 yieldval: Sig.YieldT,
                 injectval: Sig.InjectT,
                 retval: Sig.ReturnT(),
-            } = undefined,
+                undefined,
+            } = .undefined,
         };
 
         return struct {
@@ -381,7 +382,12 @@ const CoroT = struct {
                 const storage = self._frame.getStorage(InnerStorage);
                 storage.value = .{ .injectval = val };
                 xresume(self._frame);
-                return storage.value.retval;
+                // After resume, the coroutine should be done and retval should be set
+                std.debug.assert(self._frame.status == .Done);
+                return switch (storage.value) {
+                    .retval => |ret| ret,
+                    else => unreachable, // Should be retval after coroutine completion
+                };
             }
 
             /// Intermediate resume, takes injected value, returns yielded value
@@ -408,11 +414,12 @@ const CoroT = struct {
 
             fn wrapfn() void {
                 const storage = thread_state.currentStorage(InnerStorage);
-                storage.value = .{ .retval = @call(
+                const result = @call(
                     .always_inline,
                     Sig.func_ptr.?.val,
                     storage.args,
-                ) };
+                );
+                storage.value = .{ .retval = result };
             }
         };
     }

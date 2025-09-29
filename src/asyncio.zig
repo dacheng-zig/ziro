@@ -126,12 +126,19 @@ pub const TCP = struct {
     exec: ?*Executor,
     tcp: xev.TCP,
 
-    pub usingnamespace Stream(Self, xev.TCP, .{
+    const S = Stream(Self, xev.TCP, .{
         .poll = true,
         .close = true,
         .read = .recv,
         .write = .send,
     });
+    pub const close = S.close;
+    pub const read = S.read;
+    pub const write = S.write;
+
+    fn stream(self: Self) xev.TCP {
+        return self.tcp;
+    }
 
     pub fn init(exec: ?*Executor, addr: std.net.Address) !Self {
         return .{ .exec = exec, .tcp = try xev.TCP.init(addr) };
@@ -143,10 +150,6 @@ pub const TCP = struct {
 
     pub fn listen(self: Self, backlog: u31) !void {
         return self.tcp.listen(backlog);
-    }
-
-    fn stream(self: Self) xev.TCP {
-        return self.tcp;
     }
 
     pub fn accept(self: Self) !Self {
@@ -240,12 +243,17 @@ pub const UDP = struct {
     exec: ?*Executor,
     udp: xev.UDP,
 
-    pub usingnamespace Stream(Self, xev.UDP, .{
+    const S = Stream(Self, xev.UDP, .{
         .poll = true,
         .close = true,
         .read = .none,
         .write = .none,
     });
+    pub const close = S.close;
+
+    fn stream(self: Self) xev.UDP {
+        return self.udp;
+    }
 
     pub fn init(exec: ?*Executor, addr: std.net.Address) !Self {
         return .{ .exec = exec, .udp = try xev.UDP.init(addr) };
@@ -253,10 +261,6 @@ pub const UDP = struct {
 
     pub fn bind(self: Self, addr: std.net.Address) !void {
         return self.udp.bind(addr);
-    }
-
-    pub fn stream(self: Self) xev.UDP {
-        return self.udp;
     }
 
     const ReadResult = xev.ReadError!usize;
@@ -340,11 +344,144 @@ pub const UDP = struct {
     }
 };
 
+pub const File = struct {
+    const Self = @This();
+
+    exec: ?*Executor,
+    file: xev.File,
+
+    const S = Stream(Self, xev.File, .{
+        .poll = true,
+        .close = true,
+        .read = .read,
+        .write = .write,
+        .threadpool = true,
+    });
+    pub const close = S.close;
+    pub const read = S.read;
+    pub const write = S.write;
+
+    fn stream(self: Self) xev.File {
+        return self.file;
+    }
+
+    pub fn init(exec: ?*Executor, file: std.fs.File) !Self {
+        return .{ .exec = exec, .file = try xev.File.init(file) };
+    }
+
+    const PReadResult = xev.ReadError!usize;
+    pub fn pread(self: Self, buf: xev.ReadBuffer, offset: u64) PReadResult {
+        const ResultT = PReadResult;
+        const Data = struct {
+            result: ResultT = undefined,
+            frame: ?Frame = null,
+
+            fn callback(
+                userdata: ?*@This(),
+                l: *xev.Loop,
+                c: *xev.Completion,
+                s: xev.File,
+                b: xev.ReadBuffer,
+                result: ResultT,
+            ) xev.CallbackAction {
+                _ = l;
+                _ = c;
+                _ = s;
+                _ = b;
+                const data = userdata.?;
+                data.result = result;
+                if (data.frame != null) ziro.xresume(data.frame.?);
+                return .disarm;
+            }
+        };
+
+        var data: Data = .{ .frame = ziro.xframe() };
+
+        const loop = getExec(self.exec).loop;
+        var c: xev.Completion = .{};
+        self.file.pread(loop, &c, buf, offset, Data, &data, &Data.callback);
+
+        try waitForCompletion(self.exec, &c);
+
+        return data.result;
+    }
+
+    const PWriteResult = xev.WriteError!usize;
+    pub fn pwrite(self: Self, buf: xev.WriteBuffer, offset: u64) PWriteResult {
+        const ResultT = PWriteResult;
+        const Data = struct {
+            result: ResultT = undefined,
+            frame: ?Frame = null,
+
+            fn callback(
+                userdata: ?*@This(),
+                l: *xev.Loop,
+                c: *xev.Completion,
+                s: xev.File,
+                b: xev.WriteBuffer,
+                result: ResultT,
+            ) xev.CallbackAction {
+                _ = l;
+                _ = c;
+                _ = s;
+                _ = b;
+                const data = userdata.?;
+                data.result = result;
+                if (data.frame != null) ziro.xresume(data.frame.?);
+                return .disarm;
+            }
+        };
+
+        var data: Data = .{ .frame = ziro.xframe() };
+
+        const loop = getExec(self.exec).loop;
+        var c: xev.Completion = .{};
+        self.file.pwrite(loop, &c, buf, offset, Data, &data, &Data.callback);
+
+        try waitForCompletion(self.exec, &c);
+
+        return data.result;
+    }
+};
+
+pub const Process = struct {
+    const Self = @This();
+
+    exec: ?*Executor,
+    p: xev.Process,
+
+    pub fn init(exec: ?*Executor, pid: std.posix.pid_t) !Self {
+        return .{ .exec = exec, .p = try xev.Process.init(pid) };
+    }
+
+    pub fn deinit(self: *Self) void {
+        self.p.deinit();
+    }
+
+    const WaitResult = xev.Process.WaitError!u32;
+    pub fn wait(self: Self) !u32 {
+        const Data = XCallback(WaitResult);
+        var c: xev.Completion = .{};
+        var data = Data.init();
+        const loop = getExec(self.exec).loop;
+        self.p.wait(loop, &c, Data, &data, &Data.callback);
+
+        try waitForCompletion(self.exec, &c);
+
+        return data.result;
+    }
+};
+
 fn Stream(comptime T: type, comptime StreamT: type, comptime options: xev.stream.Options) type {
     return struct {
-        pub usingnamespace if (options.close) Closeable(T, StreamT) else struct {};
-        pub usingnamespace if (options.read != .none) Readable(T, StreamT) else struct {};
-        pub usingnamespace if (options.write != .none) Writeable(T, StreamT) else struct {};
+        const C_: ?type = if (options.close) Closeable(T, StreamT) else null;
+        pub const close = if (C_) |C| C.close else {};
+
+        const R_: ?type = if (options.read != .none) Readable(T, StreamT) else null;
+        pub const read = if (R_) |R| R.read else {};
+
+        const W_: ?type = if (options.write != .none) Writeable(T, StreamT) else null;
+        pub const write = if (W_) |W| W.write else {};
     };
 }
 
@@ -470,131 +607,6 @@ fn Writeable(comptime T: type, comptime StreamT: type) type {
         }
     };
 }
-
-pub const File = struct {
-    const Self = @This();
-
-    exec: ?*Executor,
-    file: xev.File,
-
-    pub usingnamespace Stream(Self, xev.File, .{
-        .poll = true,
-        .close = true,
-        .read = .read,
-        .write = .write,
-        .threadpool = true,
-    });
-
-    pub fn init(exec: ?*Executor, file: std.fs.File) !Self {
-        return .{ .exec = exec, .file = try xev.File.init(file) };
-    }
-
-    fn stream(self: Self) xev.File {
-        return self.file;
-    }
-
-    const PReadResult = xev.ReadError!usize;
-    pub fn pread(self: Self, buf: xev.ReadBuffer, offset: u64) PReadResult {
-        const ResultT = PReadResult;
-        const Data = struct {
-            result: ResultT = undefined,
-            frame: ?Frame = null,
-
-            fn callback(
-                userdata: ?*@This(),
-                l: *xev.Loop,
-                c: *xev.Completion,
-                s: xev.File,
-                b: xev.ReadBuffer,
-                result: ResultT,
-            ) xev.CallbackAction {
-                _ = l;
-                _ = c;
-                _ = s;
-                _ = b;
-                const data = userdata.?;
-                data.result = result;
-                if (data.frame != null) ziro.xresume(data.frame.?);
-                return .disarm;
-            }
-        };
-
-        var data: Data = .{ .frame = ziro.xframe() };
-
-        const loop = getExec(self.exec).loop;
-        var c: xev.Completion = .{};
-        self.file.pread(loop, &c, buf, offset, Data, &data, &Data.callback);
-
-        try waitForCompletion(self.exec, &c);
-
-        return data.result;
-    }
-
-    const PWriteResult = xev.WriteError!usize;
-    pub fn pwrite(self: Self, buf: xev.WriteBuffer, offset: u64) PWriteResult {
-        const ResultT = PWriteResult;
-        const Data = struct {
-            result: ResultT = undefined,
-            frame: ?Frame = null,
-
-            fn callback(
-                userdata: ?*@This(),
-                l: *xev.Loop,
-                c: *xev.Completion,
-                s: xev.File,
-                b: xev.WriteBuffer,
-                result: ResultT,
-            ) xev.CallbackAction {
-                _ = l;
-                _ = c;
-                _ = s;
-                _ = b;
-                const data = userdata.?;
-                data.result = result;
-                if (data.frame != null) ziro.xresume(data.frame.?);
-                return .disarm;
-            }
-        };
-
-        var data: Data = .{ .frame = ziro.xframe() };
-
-        const loop = getExec(self.exec).loop;
-        var c: xev.Completion = .{};
-        self.file.pwrite(loop, &c, buf, offset, Data, &data, &Data.callback);
-
-        try waitForCompletion(self.exec, &c);
-
-        return data.result;
-    }
-};
-
-pub const Process = struct {
-    const Self = @This();
-
-    exec: ?*Executor,
-    p: xev.Process,
-
-    pub fn init(exec: ?*Executor, pid: std.posix.pid_t) !Self {
-        return .{ .exec = exec, .p = try xev.Process.init(pid) };
-    }
-
-    pub fn deinit(self: *Self) void {
-        self.p.deinit();
-    }
-
-    const WaitResult = xev.Process.WaitError!u32;
-    pub fn wait(self: Self) !u32 {
-        const Data = XCallback(WaitResult);
-        var c: xev.Completion = .{};
-        var data = Data.init();
-        const loop = getExec(self.exec).loop;
-        self.p.wait(loop, &c, Data, &data, &Data.callback);
-
-        try waitForCompletion(self.exec, &c);
-
-        return data.result;
-    }
-};
 
 pub const AsyncNotification = struct {
     const Self = @This();

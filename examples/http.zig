@@ -6,6 +6,10 @@ const aio = ziro.asyncio;
 
 const log = std.log.scoped(.@"ziro/example/http");
 
+// listen
+const IP = "127.0.0.1";
+const PORT = 8008;
+
 const STACK_SIZE: usize = 1024 * 64;
 const HTTP_RESPONSE = "HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nContent-Length: 13\r\nContent-Type: text/plain\r\n\r\nHello World\r\n";
 
@@ -25,11 +29,11 @@ pub fn main() !void {
     });
 
     // server listen
-    const address = try std.net.Address.parseIp("127.0.0.1", 8008);
+    const address = try std.net.Address.parseIp(IP, PORT);
     var server = try aio.TCP.init(&executor, address);
     try server.bind(address);
     try server.listen(1024);
-    log.info("HTTP server listening on {}", .{address});
+    log.info("HTTP server listening on {s}:{d}", .{ IP, PORT });
 
     // run main coroutine
     try aio.run(&executor, serve, .{server}, null);
@@ -42,7 +46,7 @@ fn serve(server: aio.TCP) !void {
 
         // spawn a new coroutine to handle http connection
         _ = ziro.xasync(handle, .{conn}, null) catch |err| {
-            log.err("connection error: {}", .{err});
+            log.err("connection error: {any}", .{err});
         };
     }
 }
@@ -57,12 +61,12 @@ fn handle(conn: aio.TCP) !void {
         // handle each request: one read, one write
         {
             _ = conn.read(.{ .slice = &buffer }) catch |e| {
-                log.err("read error: {}", .{e});
+                log.err("read error: {any}", .{e});
                 return;
             };
 
             _ = conn.write(.{ .slice = HTTP_RESPONSE }) catch |e| {
-                log.err("write error: {}", .{e});
+                log.err("write error: {any}", .{e});
                 return;
             };
         }

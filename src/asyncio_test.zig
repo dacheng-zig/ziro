@@ -20,7 +20,7 @@ const AioTest = struct {
 
         const stack_size = 1024 * 128;
         const num_stacks = 5;
-        const stacks = try allocator.alignedAlloc(u8, ziro.stack_alignment, num_stacks * stack_size);
+        const stacks = try allocator.alignedAlloc(u8, std.mem.Alignment.fromByteUnits(ziro.stack_alignment), num_stacks * stack_size);
 
         // Thread-local env
         env = .{
@@ -428,7 +428,7 @@ const TaskState = struct {
 };
 
 fn notifyAfterBlockingSleep(notifcation: *aio.AsyncNotification, state: *NotifierState) void {
-    std.time.sleep(20 * std.time.ns_per_ms);
+    std.Thread.sleep(20 * std.time.ns_per_ms);
     notifcation.notifier.notify() catch unreachable;
     state.notified = true;
 }
