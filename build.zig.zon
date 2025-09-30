@@ -6,8 +6,8 @@
 
     .dependencies = .{
         .libxev = .{
-            .url = "git+https://github.com/mitchellh/libxev#94ed6af7b2aaaeab987fbf87fcee410063df715b",
-            .hash = "libxev-0.0.0-86vtc-zkEgB7uv1i0Sa6ytJETZQi_lHJrImu9mLb9moi",
+            .url = "git+https://github.com/dacheng-zig/libxev#68f5dc7c512269d83b952d4bbda94c3c1bf4e4c6",
+            .hash = "libxev-0.0.0-86vtc2odEwBDzC8p8WoJl4IPhkBGNijDyppIFakxEzaL",
         },
     },
 
