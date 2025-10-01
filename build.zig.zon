@@ -6,16 +6,16 @@
 
     .dependencies = .{
         .libxev = .{
-            .url = "git+https://github.com/dacheng-zig/libxev#68f5dc7c512269d83b952d4bbda94c3c1bf4e4c6",
-            .hash = "libxev-0.0.0-86vtc2odEwBDzC8p8WoJl4IPhkBGNijDyppIFakxEzaL",
+            .url = "git+https://github.com/mitchellh/libxev#bf51d2c8b3bcd680155f2286292bda7c17381cad",
+            .hash = "libxev-0.0.0-86vtc94dEwDzqJ3MBg1juPsE61r_uJ4V0NYjhOp_7m-B",
         },
     },
 
     .paths = .{
+        "LICENSE",
         "README.md",
         "build.zig",
         "build.zig.zon",
-        "benchmark.zig",
         "src",
     },
 }
